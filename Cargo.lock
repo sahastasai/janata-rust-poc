@@ -2766,7 +2766,6 @@ dependencies = [
  "janata-domain",
  "serde",
  "serde_json",
- "subtle",
  "web-sys",
  "worker",
 ]

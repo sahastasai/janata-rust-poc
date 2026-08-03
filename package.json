@@ -16,6 +16,8 @@
     "worker:deploy:production": "bunx wrangler deploy --config deploy/wrangler.production.jsonc",
     "worker:smoke": "bun deploy/smoke-worker.ts",
     "worker:startup": "deploy/profile-worker.sh",
+    "auth:local": "bun tests/auth-local/runner.ts",
+    "auth:local:typecheck": "bunx tsc --noEmit --project tests/auth-local/tsconfig.json",
     "e2e:typecheck": "bunx tsc --noEmit --project tests/e2e/tsconfig.json",
     "e2e:current": "bunx playwright test --config tests/e2e/playwright.config.ts --grep @current",
     "e2e:parity": "bunx playwright test --config tests/e2e/playwright.config.ts --grep @parity"

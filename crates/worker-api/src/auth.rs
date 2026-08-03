@@ -15,20 +15,22 @@ use janata_api_contract::{
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use subtle::ConstantTimeEq as _;
-use worker::js_sys::{Array, ArrayBuffer, Object, Uint8Array};
+use worker::js_sys::{Array, ArrayBuffer, Function, Object, Reflect, Uint8Array};
 use worker::wasm_bindgen::{JsCast, JsValue};
 use worker::{D1Database, Env, Request, Result};
 
 const AUTH_DB_BINDING: &str = "AUTH_DB";
+const AUTH_KDF_LIMITER_BINDING: &str = "AUTH_KDF_LIMITER";
+const AUTH_ACCOUNT_LIMITER_BINDING: &str = "AUTH_ACCOUNT_LIMITER";
 const MAX_JSON_BYTES: usize = 16 * 1024;
-const PASSWORD_ITERATIONS: u32 = 100_000;
+const PASSWORD_ITERATIONS: u32 = 600_000;
 const PASSWORD_SALT_BYTES: usize = 16;
 const PASSWORD_HASH_BYTES: usize = 32;
 const SESSION_TOKEN_BYTES: usize = 32;
 const SESSION_TTL_SECONDS: i64 = 7 * 24 * 60 * 60;
 const LOGIN_FAILURE_LIMIT: i32 = 5;
 const LOGIN_COOLDOWN_SECONDS: i64 = 15 * 60;
+const DUMMY_USER_ID: &str = "00000000-0000-0000-0000-000000000000";
 const SESSION_COOKIE: &str = "__Host-janata_session";
 const CSRF_COOKIE: &str = "__Host-janata_csrf";
 
@@ -158,11 +160,20 @@ pub(crate) async fn handle(
     request: &mut Request,
     env: &Env,
 ) -> Result<AuthResult> {
+    if matches!(action, AuthAction::Register | AuthAction::Login)
+        && !env
+            .rate_limiter(AUTH_KDF_LIMITER_BINDING)?
+            .limit("password-auth".to_owned())
+            .await?
+            .success
+    {
+        return Ok(Err(rate_limited()));
+    }
     let db = env.d1(AUTH_DB_BINDING)?;
     match action {
         AuthAction::ValidateInvite => validate_invite(request, &db).await,
-        AuthAction::Register => register(request, &db).await,
-        AuthAction::Login => login(request, &db).await,
+        AuthAction::Register => register(request, &db, env).await,
+        AuthAction::Login => login(request, &db, env).await,
         AuthAction::Session => session(request, &db).await,
         AuthAction::Logout => logout(request, &db).await,
     }
@@ -198,7 +209,7 @@ async fn validate_invite(request: &mut Request, db: &D1Database) -> Result<AuthR
     )?))
 }
 
-async fn register(request: &mut Request, db: &D1Database) -> Result<AuthResult> {
+async fn register(request: &mut Request, db: &D1Database, env: &Env) -> Result<AuthResult> {
     let input: RegisterRequest = match read_json(request).await? {
         Ok(input) => input,
         Err(problem) => return Ok(Err(problem)),
@@ -214,24 +225,13 @@ async fn register(request: &mut Request, db: &D1Database) -> Result<AuthResult> 
     if let Err(problem) = valid_new_password(&input.password) {
         return Ok(Err(problem));
     }
+    if !account_rate_allowed(env, "register", &email).await? {
+        return Ok(Err(rate_limited()));
+    }
     let invite_code = match bounded_invite_code(&input.invite_code) {
         Ok(code) => code,
         Err(problem) => return Ok(Err(problem)),
     };
-
-    let already_exists = db
-        .prepare("SELECT 1 AS present FROM auth_users WHERE email_normalized = ?1 LIMIT 1")
-        .bind(&[JsValue::from_str(&email)])?
-        .first::<i32>(Some("present"))
-        .await?
-        .is_some();
-    if already_exists {
-        return Ok(Err(AuthProblem::new(
-            "account_exists",
-            "An account already exists for this email address.",
-            409,
-        )));
-    }
 
     let salt = random_bytes(PASSWORD_SALT_BYTES)?;
     let password_hash = pbkdf2(&input.password, &salt, PASSWORD_ITERATIONS).await?;
@@ -253,7 +253,8 @@ async fn register(request: &mut Request, db: &D1Database) -> Result<AuthResult> 
              SELECT ?1, ?2, ?3, verification_level, role, 1, ?4, ?5, ?6, 1, 0, NULL, ?7, ?7 \
              FROM invite_codes WHERE code_hash = ?8 AND is_active = 1 \
              AND revoked_at IS NULL AND expires_at > ?7 \
-             AND (max_uses IS NULL OR use_count < max_uses)",
+             AND (max_uses IS NULL OR use_count < max_uses) \
+             AND NOT EXISTS (SELECT 1 FROM auth_users WHERE email_normalized = ?2)",
         )
         .bind(&[
             JsValue::from_str(&user_id),
@@ -269,9 +270,16 @@ async fn register(request: &mut Request, db: &D1Database) -> Result<AuthResult> 
         .prepare(
             "UPDATE invite_codes SET use_count = use_count + 1 \
              WHERE code_hash = ?1 AND is_active = 1 AND revoked_at IS NULL \
-             AND expires_at > ?2 AND (max_uses IS NULL OR use_count < max_uses)",
+             AND expires_at > ?2 AND (max_uses IS NULL OR use_count < max_uses) \
+             AND EXISTS (SELECT 1 FROM auth_users WHERE id = ?3 \
+             AND email_normalized = ?4 AND created_at = ?2)",
         )
-        .bind(&[JsValue::from_str(&invite_hash), js_number(now)])?;
+        .bind(&[
+            JsValue::from_str(&invite_hash),
+            js_number(now),
+            JsValue::from_str(&user_id),
+            JsValue::from_str(&email),
+        ])?;
     let results = db.batch(vec![insert, consume]).await?;
     let inserted = results
         .first()
@@ -280,9 +288,9 @@ async fn register(request: &mut Request, db: &D1Database) -> Result<AuthResult> 
         .unwrap_or_default();
     if inserted != 1 {
         return Ok(Err(AuthProblem::new(
-            "invite_invalid",
-            "The invite code is invalid, expired, revoked, or fully used.",
-            400,
+            "registration_unavailable",
+            "Registration could not be completed with these details.",
+            409,
         )));
     }
 
@@ -295,7 +303,7 @@ async fn register(request: &mut Request, db: &D1Database) -> Result<AuthResult> 
     )?))
 }
 
-async fn login(request: &mut Request, db: &D1Database) -> Result<AuthResult> {
+async fn login(request: &mut Request, db: &D1Database, env: &Env) -> Result<AuthResult> {
     let input: AuthenticateRequest = match read_json(request).await? {
         Ok(input) => input,
         Err(problem) => return Ok(Err(problem)),
@@ -304,6 +312,9 @@ async fn login(request: &mut Request, db: &D1Database) -> Result<AuthResult> {
     let password_chars = input.password.chars().count();
     if password_chars == 0 || password_chars > 128 || input.password.len() > 512 {
         return Ok(Err(invalid_credentials()));
+    }
+    if !account_rate_allowed(env, "login", &email).await? {
+        return Ok(Err(rate_limited()));
     }
 
     let user = db
@@ -334,10 +345,11 @@ async fn login(request: &mut Request, db: &D1Database) -> Result<AuthResult> {
             )
         });
     let candidate = pbkdf2(&input.password, &salt, iterations).await?;
-    let password_matches = bool::from(candidate.as_slice().ct_eq(expected_hash.as_slice()));
+    let password_matches = timing_safe_equal(&candidate, &expected_hash)?;
     let now = unix_seconds();
 
     let Some(user) = user else {
+        record_failed_login(db, DUMMY_USER_ID, now).await?;
         return Ok(Err(invalid_credentials()));
     };
     if user
@@ -346,10 +358,11 @@ async fn login(request: &mut Request, db: &D1Database) -> Result<AuthResult> {
     {
         // Keep the same response as every other failed login so a cooldown
         // cannot be used to confirm whether an account exists.
+        record_failed_login(db, DUMMY_USER_ID, now).await?;
         return Ok(Err(invalid_credentials()));
     }
     if !password_matches {
-        record_failed_login(db, &user, now).await?;
+        record_failed_login(db, &user.id, now).await?;
         return Ok(Err(invalid_credentials()));
     }
 
@@ -475,7 +488,7 @@ async fn logout(request: &Request, db: &D1Database) -> Result<AuthResult> {
     let (Some(csrf_cookie), Some(csrf_header)) = (csrf_cookie, csrf_header) else {
         return Ok(Err(csrf_problem()));
     };
-    if !constant_time_equal(csrf_cookie.as_bytes(), csrf_header.as_bytes()) {
+    if !timing_safe_equal(csrf_cookie.as_bytes(), csrf_header.as_bytes())? {
         return Ok(Err(csrf_problem()));
     }
 
@@ -490,7 +503,7 @@ async fn logout(request: &Request, db: &D1Database) -> Result<AuthResult> {
         .await?;
     if let Some(row) = row {
         let presented_hash = sha256_b64(csrf_header.as_bytes()).await?;
-        if !constant_time_equal(presented_hash.as_bytes(), row.csrf_hash.as_bytes()) {
+        if !timing_safe_equal(presented_hash.as_bytes(), row.csrf_hash.as_bytes())? {
             return Ok(Err(csrf_problem()));
         }
         let now = unix_seconds();
@@ -507,23 +520,37 @@ async fn logout(request: &Request, db: &D1Database) -> Result<AuthResult> {
     .with_cleared_cookies()))
 }
 
-async fn record_failed_login(db: &D1Database, user: &LoginUserRow, now: i64) -> Result<()> {
+async fn record_failed_login(db: &D1Database, user_id: &str, now: i64) -> Result<()> {
     let blocked_until = now + LOGIN_COOLDOWN_SECONDS;
     db.prepare(
         "UPDATE auth_users SET \
-         login_blocked_until = CASE WHEN failed_login_count + 1 >= ?1 THEN ?2 \
-         ELSE login_blocked_until END, \
-         failed_login_count = failed_login_count + 1, updated_at = ?3 WHERE id = ?4",
+         login_blocked_until = CASE \
+           WHEN (CASE WHEN login_blocked_until IS NOT NULL AND login_blocked_until <= ?3 \
+             THEN 1 ELSE failed_login_count + 1 END) >= ?1 THEN ?2 \
+           ELSE NULL END, \
+         failed_login_count = CASE \
+           WHEN login_blocked_until IS NOT NULL AND login_blocked_until <= ?3 THEN 1 \
+           ELSE failed_login_count + 1 END, \
+         updated_at = ?3 WHERE id = ?4",
     )
     .bind(&[
         JsValue::from_f64(f64::from(LOGIN_FAILURE_LIMIT)),
         js_number(blocked_until),
         js_number(now),
-        JsValue::from_str(&user.id),
+        JsValue::from_str(user_id),
     ])?
     .run()
     .await?;
     Ok(())
+}
+
+async fn account_rate_allowed(env: &Env, scope: &str, email: &str) -> Result<bool> {
+    let account_hash = sha256_b64(email.as_bytes()).await?;
+    Ok(env
+        .rate_limiter(AUTH_ACCOUNT_LIMITER_BINDING)?
+        .limit(format!("{scope}:{account_hash}"))
+        .await?
+        .success)
 }
 
 async fn read_json<T: DeserializeOwned>(
@@ -569,7 +596,8 @@ async fn read_json<T: DeserializeOwned>(
 }
 
 async fn pbkdf2(password: &str, salt: &[u8], iterations: u32) -> Result<Vec<u8>> {
-    if !(PASSWORD_ITERATIONS..=600_000).contains(&iterations) || salt.len() != PASSWORD_SALT_BYTES {
+    if !(PASSWORD_ITERATIONS..=2_400_000).contains(&iterations) || salt.len() != PASSWORD_SALT_BYTES
+    {
         return Err(worker::Error::RustError(
             "stored password derivation parameters are invalid".into(),
         ));
@@ -706,8 +734,27 @@ fn bounded_invite_code(input: &str) -> std::result::Result<&str, AuthProblem> {
         })
 }
 
-fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
-    left.len() == right.len() && bool::from(left.ct_eq(right))
+fn timing_safe_equal(left: &[u8], right: &[u8]) -> Result<bool> {
+    let subtle = crypto()?.subtle();
+    let function = Reflect::get(subtle.as_ref(), &JsValue::from_str("timingSafeEqual"))?
+        .dyn_into::<Function>()?;
+    let left = Uint8Array::from(left);
+    let right = Uint8Array::from(right);
+    let compared = if left.length() == right.length() {
+        function.call2(subtle.as_ref(), left.as_ref(), right.as_ref())?
+    } else {
+        // Cloudflare's native helper requires equal lengths. Calling it even
+        // for a mismatch avoids a secret-length early return; negating a
+        // self-comparison deterministically yields false.
+        let self_comparison = function.call2(subtle.as_ref(), left.as_ref(), left.as_ref())?;
+        let equal = self_comparison.as_bool().ok_or_else(|| {
+            worker::Error::RustError("crypto.subtle.timingSafeEqual returned a non-boolean".into())
+        })?;
+        JsValue::from_bool(!equal)
+    };
+    compared.as_bool().ok_or_else(|| {
+        worker::Error::RustError("crypto.subtle.timingSafeEqual returned a non-boolean".into())
+    })
 }
 
 fn session_user(user: &LoginUserRow) -> SessionUser {
@@ -755,6 +802,14 @@ const fn body_too_large() -> AuthProblem {
     )
 }
 
+const fn rate_limited() -> AuthProblem {
+    AuthProblem::new(
+        "auth_rate_limited",
+        "Too many authentication attempts. Please wait before trying again.",
+        429,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -776,13 +831,6 @@ mod tests {
         assert!(valid_new_password("short").is_err());
         assert_eq!(bounded_display_name("  Sādhaka  ").unwrap(), "Sādhaka");
         assert!(bounded_display_name("A\nB").is_err());
-    }
-
-    #[test]
-    fn constant_time_comparison_rejects_length_and_content_mismatches() {
-        assert!(constant_time_equal(b"fixed-token", b"fixed-token"));
-        assert!(!constant_time_equal(b"fixed-token", b"other-token"));
-        assert!(!constant_time_equal(b"short", b"longer"));
     }
 
     #[test]

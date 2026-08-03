@@ -12,7 +12,7 @@ CREATE TABLE auth_users (
     token_version INTEGER NOT NULL DEFAULT 1 CHECK (token_version >= 1),
     password_salt TEXT NOT NULL,
     password_hash TEXT NOT NULL,
-    password_iterations INTEGER NOT NULL CHECK (password_iterations >= 100000),
+    password_iterations INTEGER NOT NULL CHECK (password_iterations >= 600000),
     is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
     failed_login_count INTEGER NOT NULL DEFAULT 0 CHECK (failed_login_count >= 0),
     login_blocked_until INTEGER,

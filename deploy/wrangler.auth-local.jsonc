@@ -25,6 +25,18 @@
       "migrations_dir": "../migrations/auth"
     }
   ],
+  "ratelimits": [
+    {
+      "name": "AUTH_KDF_LIMITER",
+      "namespace_id": "17857974",
+      "simple": { "limit": 1200, "period": 60 }
+    },
+    {
+      "name": "AUTH_ACCOUNT_LIMITER",
+      "namespace_id": "17857975",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
   "assets": {
     "directory": "../dist/site",
     "not_found_handling": "single-page-application",
