@@ -17,4 +17,11 @@ mobile = ["dioxus/mobile"]
 dioxus = { workspace = true, features = ["asset", "router"] }
 janata-api-contract = { path = "../../crates/api-contract" }
 janata-domain = { path = "../../crates/domain" }
+serde.workspace = true
 web-sys = { version = "0.3", optional = true, features = ["Location"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "query"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "query", "rustls"] }

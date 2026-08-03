@@ -7,6 +7,15 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
+/// Failure returned when an API path does not contain a canonical entity UUID.
+///
+/// Janata route identifiers intentionally accept only lowercase, hyphenated
+/// UUIDs. `uuid` itself accepts several additional textual forms; rejecting
+/// those aliases keeps cache keys and deep links unambiguous.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[error("identifier must be a lowercase hyphenated UUID")]
+pub struct EntityIdParseError;
+
 macro_rules! entity_id {
     ($name:ident, $doc:literal) => {
         #[doc = $doc]
@@ -21,6 +30,30 @@ macro_rules! entity_id {
             #[must_use]
             pub const fn new(value: Uuid) -> Self {
                 Self(value)
+            }
+
+            /// Parses the one canonical representation accepted in API paths.
+            ///
+            /// # Errors
+            ///
+            /// Returns [`EntityIdParseError`] for uppercase, compact, braced,
+            /// malformed, or otherwise non-canonical UUID text.
+            pub fn parse_canonical(candidate: &str) -> Result<Self, EntityIdParseError> {
+                if candidate.len() != 36
+                    || candidate
+                        .bytes()
+                        .enumerate()
+                        .any(|(index, byte)| match index {
+                            8 | 13 | 18 | 23 => byte != b'-',
+                            _ => !byte.is_ascii_digit() && !(b'a'..=b'f').contains(&byte),
+                        })
+                {
+                    return Err(EntityIdParseError);
+                }
+
+                Uuid::parse_str(candidate)
+                    .map(Self)
+                    .map_err(|_| EntityIdParseError)
             }
         }
 
@@ -124,12 +157,22 @@ pub struct Center {
     pub website: Option<String>,
     /// Optional public image URL.
     pub image_url: Option<String>,
+    /// Optional public telephone number.
+    pub phone: Option<String>,
+    /// Optional resident acharya display name.
+    pub acharya: Option<String>,
+    /// Optional public point-of-contact label.
+    pub point_of_contact: Option<String>,
+    /// Optional public description maintained by center stewards.
+    pub description: Option<String>,
+    /// Public aggregate membership count; never a member roster.
+    pub member_count: u32,
     /// Whether an administrator has verified the listing.
     pub verified: bool,
 }
 
 /// Public event information used by discover, detail, and profile flows.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Event {
     /// Stable event identifier.
@@ -144,16 +187,36 @@ pub struct Event {
     pub description: String,
     /// ISO 8601 calendar date (`YYYY-MM-DD`).
     pub date: String,
+    /// Optional end date for multi-day events.
+    pub end_date: Option<String>,
+    /// Whether the event repeats according to its source calendar.
+    pub recurring: bool,
     /// Human-readable local-time label.
     pub time_label: String,
     /// Venue or address.
     pub location: String,
+    /// Postal address when it differs from the venue label.
+    pub address: Option<String>,
+    /// Geographic latitude when known.
+    pub latitude: Option<f64>,
+    /// Geographic longitude when known.
+    pub longitude: Option<f64>,
     /// Optional category such as satsang or seva.
     pub category: Option<String>,
     /// Optional public image URL.
     pub image_url: Option<String>,
+    /// Optional public point-of-contact label.
+    pub point_of_contact: Option<String>,
+    /// Optional source page with more event information.
+    pub external_url: Option<String>,
+    /// Optional official registration destination.
+    pub signup_url: Option<String>,
     /// Whether Janata sign-up is enabled.
     pub allow_janata_signup: bool,
+    /// Whether the source marked the event as official.
+    pub official: bool,
+    /// Whether registration requires a verified account.
+    pub requires_verified: bool,
     /// Current attendee count.
     pub attendee_count: u32,
 }
@@ -306,5 +369,26 @@ mod tests {
         assert_eq!(validate_optional_https_url("website", None), Ok(None));
         assert!(validate_optional_https_url("website", Some("http://example.com")).is_err());
         assert!(validate_optional_https_url("website", Some("https://example.com")).is_ok());
+    }
+
+    #[test]
+    fn route_ids_accept_only_canonical_lowercase_uuids() {
+        let canonical = "00000000-0000-0000-0000-000000000065";
+        assert_eq!(
+            CenterId::parse_canonical(canonical).map(|id| id.to_string()),
+            Ok(canonical.to_owned())
+        );
+
+        for alias in [
+            "00000000000000000000000000000065",
+            "{00000000-0000-0000-0000-000000000065}",
+            "00000000-0000-0000-0000-00000000006A",
+            "not-a-uuid",
+        ] {
+            assert!(
+                CenterId::parse_canonical(alias).is_err(),
+                "{alias} must be rejected"
+            );
+        }
     }
 }

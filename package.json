@@ -3,6 +3,9 @@
   "private": true,
   "packageManager": "bun@1.3.7",
   "devDependencies": {
+    "@playwright/test": "1.58.2",
+    "@types/bun": "1.3.7",
+    "typescript": "5.9.3",
     "wrangler": "4.118.0"
   },
   "scripts": {
@@ -12,6 +15,9 @@
     "worker:deploy:preview": "bunx wrangler deploy --config deploy/wrangler.jsonc",
     "worker:deploy:production": "bunx wrangler deploy --config deploy/wrangler.production.jsonc",
     "worker:smoke": "bun deploy/smoke-worker.ts",
-    "worker:startup": "deploy/profile-worker.sh"
+    "worker:startup": "deploy/profile-worker.sh",
+    "e2e:typecheck": "bunx tsc --noEmit --project tests/e2e/tsconfig.json",
+    "e2e:current": "bunx playwright test --config tests/e2e/playwright.config.ts --grep @current",
+    "e2e:parity": "bunx playwright test --config tests/e2e/playwright.config.ts --grep @parity"
   }
 }

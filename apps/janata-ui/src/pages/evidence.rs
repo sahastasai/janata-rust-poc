@@ -155,14 +155,14 @@ pub(crate) fn Docs() -> Element {
             section { id: "mental-model", class: "docs-section",
                 p { class: "utility-label", "01 · MENTAL MODEL" }
                 h2 { "A route is a screen; a component is a reusable piece." }
-                p { "The `Route` enum in `src/main.rs` is the app map. Each enum variant has a component with the same name in `src/pages.rs`. Dioxus renders components from `rsx!` markup, and signals hold small pieces of interactive state." }
-                pre { class: "command-block", code { "Route::Discover  →  pages::Discover  →  EventPreview\n        navigation     presentation       preview model" } }
+                p { "The `Route` enum in `src/main.rs` is the app map. Routed components are re-exported from `src/pages/mod.rs` and implemented in named route modules such as `src/pages/discover.rs`. Dioxus renders components from `rsx!` markup, and signals hold small pieces of interactive state." }
+                pre { class: "command-block", code { "Route::Discover (/explore)  →  pages::discover::Discover  →  api::fetch_discover  →  Rust Worker\n        navigation path                presentation             typed request          backend" } }
             }
             section { id: "make-change", class: "docs-section",
                 p { class: "utility-label", "02 · MAKE A CHANGE" }
                 h2 { "Follow one narrow loop." }
                 ol { class: "contributor-steps",
-                    li { strong { "Find the route." } span { "Open `src/pages.rs` and locate the screen name." } }
+                    li { strong { "Find the route." } span { "Open `src/pages/mod.rs`, then follow the screen re-export to its named route module, such as `src/pages/discover.rs`." } }
                     li { strong { "Change one behavior." } span { "Keep network access behind a contract; do not hide a request inside presentation code." } }
                     li { strong { "Let the tools explain." } span { "Run format, check, tests, and Clippy. Read the first compiler error before the rest." } }
                     li { strong { "Check both shapes." } span { "Review a narrow mobile viewport and a wide desktop viewport, then use the mobile feature compile gate." } }

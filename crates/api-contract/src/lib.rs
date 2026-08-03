@@ -30,6 +30,13 @@ pub struct ApiError {
     pub request_id: String,
 }
 
+/// Stable error wrapper returned for every non-successful API response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiErrorEnvelope {
+    /// The client-safe failure and support correlation identifier.
+    pub error: ApiError,
+}
+
 /// Paginated response shared by list endpoints.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -72,6 +79,29 @@ pub struct DiscoverResponse {
     pub events: Vec<Event>,
 }
 
+/// Public, cursor-paginated center collection.
+pub type CentersResponse = Page<Center>;
+
+/// Public, cursor-paginated event collection.
+pub type EventsResponse = Page<Event>;
+
+/// One public center plus its bounded upcoming-event page.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CenterDetailResponse {
+    /// Requested center.
+    pub center: Center,
+    /// Upcoming events owned by this center.
+    pub events: Page<Event>,
+}
+
+/// One public event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EventDetailResponse {
+    /// Requested event.
+    pub event: Event,
+}
+
 /// Community feed response.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -103,13 +133,45 @@ pub struct EndpointSpec {
     pub summary: &'static str,
 }
 
-/// POC endpoints implemented during the compile-first foundation phase.
-pub const FOUNDATION_ENDPOINTS: &[EndpointSpec] = &[EndpointSpec {
-    method: "GET",
-    path: "/api/health",
-    authorization: "public",
-    summary: "Report POC service and revision status",
-}];
+/// Typed public endpoints currently implemented by the Rust Worker.
+pub const FOUNDATION_ENDPOINTS: &[EndpointSpec] = &[
+    EndpointSpec {
+        method: "GET",
+        path: "/api/health",
+        authorization: "public",
+        summary: "Report POC service and revision status",
+    },
+    EndpointSpec {
+        method: "GET",
+        path: "/api/v1/discover",
+        authorization: "public",
+        summary: "Read a bounded center and event discovery snapshot",
+    },
+    EndpointSpec {
+        method: "GET",
+        path: "/api/v1/centers",
+        authorization: "public",
+        summary: "List public centers with cursor pagination",
+    },
+    EndpointSpec {
+        method: "GET",
+        path: "/api/v1/centers/:id",
+        authorization: "public",
+        summary: "Read one center and its bounded upcoming events",
+    },
+    EndpointSpec {
+        method: "GET",
+        path: "/api/v1/events",
+        authorization: "public",
+        summary: "List and filter public events with cursor pagination",
+    },
+    EndpointSpec {
+        method: "GET",
+        path: "/api/v1/events/:id",
+        authorization: "public",
+        summary: "Read one public event",
+    },
+];
 
 #[cfg(test)]
 mod tests {
@@ -125,5 +187,51 @@ mod tests {
         let value = serde_json::to_value(response).expect("health response should serialize");
         assert_eq!(value["revision"], "abc123");
         assert!(value.get("request_id").is_none());
+    }
+
+    #[test]
+    fn error_envelope_preserves_the_support_identifier() {
+        let response = ApiErrorEnvelope {
+            error: ApiError {
+                code: "not_found".to_owned(),
+                message: "Event not found.".to_owned(),
+                request_id: "request-123".to_owned(),
+            },
+        };
+        let value = serde_json::to_value(response).expect("error response should serialize");
+        assert_eq!(value["error"]["requestId"], "request-123");
+        assert!(value["error"].get("request_id").is_none());
+    }
+
+    #[test]
+    fn public_detail_contracts_round_trip() {
+        let center: Center = serde_json::from_value(serde_json::json!({
+            "id": "00000000-0000-0000-0000-000000000065",
+            "name": "Chinmaya Vrindavan",
+            "address": "San Jose, California",
+            "latitude": 37.3382,
+            "longitude": -121.8863,
+            "website": "https://www.cmsj.org/",
+            "imageUrl": null,
+            "phone": null,
+            "acharya": "Swami Shantananda",
+            "pointOfContact": "Center office",
+            "description": "A public sample center.",
+            "memberCount": 108,
+            "verified": true
+        }))
+        .expect("center contract should deserialize");
+        let response = CenterDetailResponse {
+            center,
+            events: Page {
+                items: Vec::new(),
+                next_cursor: None,
+            },
+        };
+        let encoded = serde_json::to_string(&response).expect("detail should serialize");
+        let decoded: CenterDetailResponse =
+            serde_json::from_str(&encoded).expect("detail should deserialize");
+        assert_eq!(decoded.center.member_count, 108);
+        assert!(decoded.events.items.is_empty());
     }
 }
