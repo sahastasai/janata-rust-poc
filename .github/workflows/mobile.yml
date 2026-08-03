@@ -48,16 +48,18 @@ jobs:
         run: >-
           dx bundle --android --release --package janata-ui
           --no-default-features --features mobile --package-types apk
-          --out-dir dist/mobile/android --cargo-args=--locked
+          --target aarch64-linux-android --out-dir dist/mobile/android
+          --cargo-args=--locked
 
       - name: Generate Android checksums
         shell: bash
         run: |
-          find dist/mobile/android -type f -name '*.apk' -print0 \
+          cd dist/mobile/android
+          find . -type f -name '*.apk' -print0 \
             | sort -z \
-            | xargs -0 -r sha256sum > dist/mobile/android/SHA256SUMS
-          test -s dist/mobile/android/SHA256SUMS
-          cat dist/mobile/android/SHA256SUMS
+            | xargs -0 -r sha256sum > SHA256SUMS
+          test -s SHA256SUMS
+          cat SHA256SUMS
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -100,9 +102,9 @@ jobs:
           test -n "$app_path"
           mkdir -p dist/mobile/ios-artifact
           ditto -c -k --sequesterRsrc --keepParent "$app_path" dist/mobile/ios-artifact/janata-ios-simulator.zip
-          shasum -a 256 dist/mobile/ios-artifact/janata-ios-simulator.zip \
-            > dist/mobile/ios-artifact/SHA256SUMS
-          cat dist/mobile/ios-artifact/SHA256SUMS
+          cd dist/mobile/ios-artifact
+          shasum -a 256 janata-ios-simulator.zip > SHA256SUMS
+          cat SHA256SUMS
 
       - name: Upload iOS simulator artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
