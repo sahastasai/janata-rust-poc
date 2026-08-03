@@ -12,6 +12,6 @@ web = ["dioxus/web"]
 mobile = ["dioxus/mobile"]
 
 [dependencies]
-dioxus = { workspace = true, features = ["router"] }
+dioxus = { workspace = true, features = ["asset", "router"] }
 janata-api-contract = { path = "../../crates/api-contract" }
 janata-domain = { path = "../../crates/domain" }
