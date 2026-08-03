@@ -1,0 +1,17 @@
+[book]
+title = "Contributing to Janata — Rust POC"
+authors = ["Project Janata contributors"]
+description = "A newcomer-friendly guide to the Dioxus, Cloudflare Workers, and SpacetimeDB proof of concept."
+language = "en"
+src = "src"
+
+[build]
+build-dir = "../../dist/docs/guide"
+create-missing = false
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/sahastasai/janata-rust-poc"
+edit-url-template = "https://github.com/sahastasai/janata-rust-poc/edit/main/docs/book/{path}"
+site-url = "/docs/guide/"

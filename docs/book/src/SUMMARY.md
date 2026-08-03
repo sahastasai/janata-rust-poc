@@ -1,0 +1,17 @@
+# Summary
+
+- [Welcome](welcome.md)
+- [Five-minute setup](setup.md)
+- [How the system fits together](architecture.md)
+- [Where code lives](crate-map.md)
+- [Rust patterns used here](rust-patterns.md)
+- [Make a contribution](contributing.md)
+  - [Add or change a screen](add-screen.md)
+  - [Add an API endpoint](add-endpoint.md)
+  - [Add a messaging reducer](add-reducer.md)
+- [Authentication and authorization](security.md)
+- [Testing](testing.md)
+- [Web and mobile targets](platforms.md)
+- [Benchmarks and optimization](benchmarks.md)
+- [Deployment and rollback](deployment.md)
+- [Troubleshooting](troubleshooting.md)
