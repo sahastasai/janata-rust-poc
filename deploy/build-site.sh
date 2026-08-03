@@ -14,6 +14,14 @@ command -v mdbook >/dev/null 2>&1 || {
   exit 1
 }
 
+# Dioxus content hashes change whenever the UI changes, but `dx build` does not
+# remove superseded hashed files. Clear only its generated public directory so
+# neither benchmarks nor deployments count or ship unreachable stale assets.
+case "$ui_output" in
+  "$repo_root"/target/dx/janata-ui/release/web/public) rm -rf -- "$ui_output" ;;
+  *) echo "Refusing to clear unexpected Dioxus output: $ui_output" >&2; exit 1 ;;
+esac
+
 (cd "$repo_root/apps/janata-ui" && dx build --web --release)
 (cd "$repo_root" && mdbook build docs/book)
 (cd "$repo_root" && RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps)
