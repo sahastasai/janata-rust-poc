@@ -8,8 +8,11 @@ production deployment, mobile-store submission, or beta release.
 The review covers the Rust workspace, Dioxus UI build surfaces, Cloudflare
 Worker API, SpacetimeDB module, contributor book, benchmark harness, and manual
 mobile packaging workflows. CI is a regression gate, not proof that the system
-is secure. No production credentials were read, no workflow was triggered, no
-store package was submitted, and no public endpoint was load-tested.
+is secure. No production credentials were read, no production workflow was
+triggered, no store package was submitted, and no public endpoint was
+load-tested. The manual mobile packaging workflow was run only in the
+independent POC repository; its unsigned artifact evidence and limitations are
+recorded in the deployment report.
 
 The earlier React/Expo application is a frozen behavioral reference. Findings
 or missing controls observed there are **historical context**, not evidence that
@@ -103,9 +106,9 @@ inside a ZIP. Both include SHA-256 manifests, retain artifacts for seven days,
 and perform no signing, deployment, or store submission.
 
 The `dx bundle` flags were checked against the locally installed Dioxus CLI
-0.7.10 help. Full Android/iOS bundles cannot be validated on this Linux machine;
-the workflows are therefore best-effort until each job completes on its hosted
-runner. A successful simulator artifact is not evidence of physical-device,
+0.7.10 help. Full Android/iOS bundles are built on their corresponding
+GitHub-hosted runners and downloaded for independent checksum and architecture
+inspection. A successful simulator artifact is not evidence of physical-device,
 codesigning, entitlement, store-policy, accessibility, or native-feature
 parity. Failure must block artifact promotion rather than be ignored.
 

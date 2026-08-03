@@ -35,7 +35,9 @@ The web POC is live at [cmrust.sahasta.com](https://cmrust.sahasta.com). Its
 [contributor guide](https://cmrust.sahasta.com/docs/guide/),
 [Rust API reference](https://cmrust.sahasta.com/docs/api/), and
 [mixed benchmark result](https://cmrust.sahasta.com/benchmarks) are hosted on
-the same deployment.
+the same deployment. The [deployment and validation
+record](https://cmrust.sahasta.com/docs/reports/deployment.md) states exactly
+what passed, what remains a gate, and how to roll back the isolated Worker.
 
 The responsive Dioxus shell, typed read-only Worker routes, private SpacetimeDB
 schema/reducers, reproducible benchmark harness, and isolated Cloudflare

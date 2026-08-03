@@ -2,6 +2,11 @@
 
 Deployment is POC-only and must never reuse existing Janata resources.
 
+The hosted [POC deployment and validation record](/docs/reports/deployment.md)
+contains the live URLs, test boundary, benchmark summary, mobile evidence,
+SpacetimeDB publication status, and release decision. Read it before treating a
+green build as evidence of readiness.
+
 ## Gate order
 
 1. Build UI, guide, and rustdoc.
