@@ -1,25 +1,27 @@
 {
   "$schema": "../node_modules/wrangler/config-schema.json",
-  // An isolated POC Worker name; this must not reuse Janata infrastructure.
   "name": "janata-cmrust-poc-worker",
   "main": "../crates/worker-api/build/worker/shim.mjs",
   "compatibility_date": "2026-08-03",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
-  "preview_urls": true,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "cmrust.sahasta.com",
+      "custom_domain": true,
+      "previews_enabled": false
+    }
+  ],
   "build": {
     "command": "../../deploy/build-worker.sh",
-    // Wrangler resolves build cwd from the process working directory.
     "cwd": "crates/worker-api",
-    // Watch paths remain relative to this configuration file.
     "watch_dir": "../crates/worker-api/src"
   },
   "assets": {
-    // `bun run poc:build` assembles Dioxus, mdBook, and rustdoc here.
     "directory": "../dist/site",
     "not_found_handling": "single-page-application",
     "html_handling": "none",
-    // Static files stay on Cloudflare's asset path; only API calls enter Wasm.
     "run_worker_first": ["/api/*"]
   },
   "observability": {

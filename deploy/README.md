@@ -6,14 +6,12 @@ Running a local build or Wrangler dry run does not deploy or change DNS.
 
 ## Static Dioxus artifact contract
 
-`web/` is the upload staging directory expected by `wrangler.jsonc`. During
-integration, replace the worker-spike smoke shell with the contents of the
-Dioxus web release output while preserving `_headers`. Wrangler serves those
-files directly from Cloudflare's static-asset layer; only `/api/*` invokes the
-Rust WebAssembly Worker.
-
-The checked-in smoke shell exists so configuration validation, local routing,
-and dry runs are deterministic before the full Dioxus bundle is integrated.
+`../dist/site/` is the generated upload staging directory expected by
+`wrangler.jsonc`. `bun run poc:build` assembles the Dioxus web release, mdBook
+guide, rustdoc API reference, and static security headers there. It excludes
+Dioxus `.br` sidecars because Cloudflare negotiates edge compression itself.
+Wrangler serves these files directly from Cloudflare's static-asset layer;
+only `/api/*` invokes the Rust WebAssembly Worker.
 
 ## Local verification
 
@@ -21,6 +19,7 @@ From the repository root:
 
 ```sh
 bun install
+bun run poc:build
 bun run worker:dry-run
 bun run worker:startup
 bun run worker:smoke
@@ -30,8 +29,11 @@ bun run worker:dev
 Then request `http://127.0.0.1:8787/` and
 `http://127.0.0.1:8787/api/health`. No credential is required for local mode.
 
-Deployment is intentionally not scripted. An authorized release owner must
-review the dry-run output and invoke Wrangler explicitly when the POC is ready.
+`bun run worker:deploy:preview` publishes only the isolated `workers.dev`
+preview. After that preview passes smoke testing, the separately reviewed
+`wrangler.production.jsonc` configuration can attach only
+`cmrust.sahasta.com`. Neither configuration contains production Janata
+bindings or secrets.
 
 ## Panic-recovery compatibility note
 

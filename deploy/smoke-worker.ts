@@ -51,7 +51,7 @@ try {
   const root = await fetch(`${baseUrl}/`);
   assert(root.status === 200, "static root did not return 200");
   assert(
-    (await root.text()).includes("Janata Rust POC"),
+    (await root.text()).includes("Chinmaya Janata"),
     "static root did not serve the staged web artifact",
   );
   assert(
@@ -64,7 +64,7 @@ try {
   });
   assert(spa.status === 200, "SPA fallback did not return 200");
   assert(
-    (await spa.text()).includes("Janata Rust POC"),
+    (await spa.text()).includes("Chinmaya Janata"),
     "SPA fallback did not return index.html",
   );
 

@@ -6,8 +6,11 @@
     "wrangler": "4.118.0"
   },
   "scripts": {
+    "poc:build": "deploy/build-site.sh",
     "worker:dev": "wrangler dev --local --config deploy/wrangler.jsonc",
     "worker:dry-run": "wrangler deploy --dry-run --config deploy/wrangler.jsonc",
+    "worker:deploy:preview": "wrangler deploy --config deploy/wrangler.jsonc",
+    "worker:deploy:production": "wrangler deploy --config deploy/wrangler.production.jsonc",
     "worker:smoke": "bun deploy/smoke-worker.ts",
     "worker:startup": "deploy/profile-worker.sh"
   }
