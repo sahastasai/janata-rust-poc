@@ -31,6 +31,27 @@ browser and mobile operating-system runtimes.
 
 ## Status
 
-The repository pins stable Dioxus 0.7.10 and is in its compile-first feasibility phase. A feature is not
-considered migrated until its contract, role matrix, responsive UI, security
-tests, and performance evidence are present.
+The web POC is live at [cmrust.sahasta.com](https://cmrust.sahasta.com). Its
+[contributor guide](https://cmrust.sahasta.com/docs/guide/),
+[Rust API reference](https://cmrust.sahasta.com/docs/api/), and
+[mixed benchmark result](https://cmrust.sahasta.com/benchmarks) are hosted on
+the same deployment.
+
+The responsive Dioxus shell, typed read-only Worker routes, private SpacetimeDB
+schema/reducers, reproducible benchmark harness, and isolated Cloudflare
+deployment are proven. Live account/session identity, UI-to-service adapters,
+Maincloud messaging publication, native capability bridges, device parity, and
+signed/store distributions remain explicit beta gates. Sample cards are never
+presented as real accounts, messages, or production data.
+
+## Start here
+
+```bash
+bun install --frozen-lockfile
+bun run poc:build
+cargo test --workspace --all-targets --locked
+```
+
+Read `docs/book/src/setup.md` before changing code. A feature is not considered
+migrated until its contract, role matrix, responsive UI, security tests, and
+performance evidence are present.
