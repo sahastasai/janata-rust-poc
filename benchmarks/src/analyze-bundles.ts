@@ -71,6 +71,10 @@ function isCompressible(path: string): boolean {
   return TEXT_EXTENSIONS.has(extname(path).toLowerCase())
 }
 
+function isPrecompressedSidecar(path: string): boolean {
+  return path.endsWith('.br') || path.endsWith('.gz')
+}
+
 interface FileMeasurement {
   variantId: string
   path: string
@@ -99,7 +103,13 @@ async function main(): Promise<void> {
     const provenance = gitProvenance(sourceRoot, variant.expectedCommit)
     assertExpectedCommit(provenance, variant.id)
     const bundleDirectory = resolveBundleDirectory(loaded, variant)
-    const files = await walkFiles(bundleDirectory)
+    const outputFiles = await walkFiles(bundleDirectory)
+    // Dioxus can emit `.br` files beside their source assets. They are an
+    // alternative representation, not additional bytes a browser downloads,
+    // so keep them visible as build-output overhead without double-counting
+    // them in the logical bundle or transfer estimates.
+    const sidecars = outputFiles.filter((file) => isPrecompressedSidecar(file.relativePath))
+    const files = outputFiles.filter((file) => !isPrecompressedSidecar(file.relativePath))
     const byCategory: Record<string, number> = {}
     let rawBytes = 0
     let gzipEstimateBytes = 0
@@ -142,6 +152,9 @@ async function main(): Promise<void> {
       buildCommand: variant.buildCommand,
       bundleDirectory,
       fileCount: files.length,
+      outputFileCount: outputFiles.length,
+      precompressedSidecarCount: sidecars.length,
+      precompressedSidecarBytes: sidecars.reduce((total, file) => total + file.bytes, 0),
       rawBytes,
       transferGzipEstimateBytes: gzipEstimateBytes,
       transferBrotliEstimateBytes: brotliEstimateBytes,
@@ -158,7 +171,7 @@ async function main(): Promise<void> {
       gzipLevel: 9,
       brotliQuality: 11,
       semantics:
-        'Offline estimate: text, SVG, JavaScript, JSON, CSS, HTML, source maps, and WASM are compressed; other files retain raw size.',
+        'Offline estimate: text, SVG, JavaScript, JSON, CSS, HTML, source maps, and WASM are compressed; other files retain raw size. Precompressed .br/.gz sidecars are reported as build-output overhead but excluded from logical bundle and transfer totals.',
     },
     variants: summaries,
   })

@@ -12,7 +12,7 @@ use query::{QueryShape, ReadQuery, parse_read_query};
 use serde_json::{Value, json};
 use worker::js_sys::{Function, Reflect};
 use worker::wasm_bindgen::{JsCast, JsValue};
-use worker::{Context, Env, Headers, Request, Response, Result, console_error, console_log, event};
+use worker::{Context, Env, Headers, Request, Response, Result, console_error, event};
 
 /// Stable service name returned by the health endpoint.
 pub const SERVICE_NAME: &str = "janata-rust-poc";
@@ -175,19 +175,10 @@ pub async fn fetch(request: Request, _env: Env, _context: Context) -> Result<Res
     });
 
     match dispatch(&request, &method, &path, &request_id) {
-        Ok(response) => {
-            console_log!(
-                "{}",
-                json!({
-                    "event": "request_complete",
-                    "request_id": request_id,
-                    "method": method,
-                    "path": path,
-                    "status": response.status_code(),
-                })
-            );
-            Ok(response)
-        }
+        // Cloudflare invocation logs already record successful requests. Avoid
+        // allocating and serializing a second log entry on the hottest path;
+        // explicit structured logging is reserved for failures below.
+        Ok(response) => Ok(response),
         Err(error) => {
             console_error!(
                 "{}",
