@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-03T20:06:17.831Z",
+  "configSha256": "785fc38db2dda2204b335e7856ce0e11626e14217927baaa63fd370049c17b8e",
+  "compression": {
+    "gzipLevel": 9,
+    "brotliQuality": 11,
+    "semantics": "Offline estimate: text, SVG, JavaScript, JSON, CSS, HTML, source maps, and WASM are compressed; other files retain raw size. Precompressed .br/.gz sidecars are reported as build-output overhead but excluded from logical bundle and transfer totals."
+  },
+  "variants": [
+    {
+      "variantId": "react-reference",
+      "role": "reference",
+      "label": "React/Expo reference",
+      "source": {
+        "sourceRoot": "<react-reference-worktree>",
+        "commit": "6e5bbacd2277b564a901e1eb4f48b566a1283802",
+        "expectedCommit": "6e5bbacd2277b564a901e1eb4f48b566a1283802",
+        "commitMatchesExpectation": true,
+        "statusPorcelain": [
+          "?? bun.lock",
+          "?? packages/frontend/dist-reference/"
+        ]
+      },
+      "buildCommand": "bunx expo export --platform web --output-dir dist-reference",
+      "bundleDirectory": "<react-reference-worktree>/packages/frontend/dist-reference",
+      "fileCount": 91,
+      "outputFileCount": 91,
+      "precompressedSidecarCount": 0,
+      "precompressedSidecarBytes": 0,
+      "rawBytes": 17051891,
+      "transferGzipEstimateBytes": 12652462,
+      "transferBrotliEstimateBytes": 12390855,
+      "byCategoryRawBytes": {
+        "css": 96390,
+        "javascript": 5385426,
+        "other": 60464,
+        "json": 1029,
+        "font": 4871296,
+        "image": 6635558,
+        "html": 1728
+      }
+    },
+    {
+      "variantId": "dioxus-poc",
+      "role": "candidate",
+      "label": "Dioxus Rust POC",
+      "source": {
+        "sourceRoot": "<dioxus-poc-worktree>",
+        "commit": "eb4777714d6174393e8a7e1dbf0f864488810f4f",
+        "expectedCommit": null,
+        "commitMatchesExpectation": null,
+        "statusPorcelain": []
+      },
+      "buildCommand": "dx build --web --release",
+      "bundleDirectory": "<dioxus-poc-worktree>/target/dx/janata-ui/release/web/public",
+      "fileCount": 9,
+      "outputFileCount": 17,
+      "precompressedSidecarCount": 8,
+      "precompressedSidecarBytes": 1616407,
+      "rawBytes": 2529822,
+      "transferGzipEstimateBytes": 2256212,
+      "transferBrotliEstimateBytes": 2222940,
+      "byCategoryRawBytes": {
+        "font": 954036,
+        "wasm": 387213,
+        "javascript": 34851,
+        "css": 27533,
+        "image": 1125643,
+        "html": 546
+      }
+    }
+  ]
+}

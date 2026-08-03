@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "comparisonName": "Pinned Janata React landing page vs Dioxus Rust POC landing page",
+  "capturedAt": "2026-08-03T20:06:09.266Z",
+  "config": {
+    "path": "<dioxus-poc-worktree>/benchmarks/config/comparison.local.json",
+    "sha256": "785fc38db2dda2204b335e7856ce0e11626e14217927baaa63fd370049c17b8e"
+  },
+  "environment": {
+    "hostname": "SairamSahanavCachy",
+    "platform": "linux",
+    "osRelease": "7.0.1-1-cachyos",
+    "cpuModel": "AMD Ryzen 7 PRO 4750U with Radeon Graphics",
+    "logicalCpuCount": 16,
+    "totalMemoryBytes": 32936091648,
+    "freeMemoryBytesAtCapture": 12670066688,
+    "bunVersion": "1.3.7",
+    "rustcVersion": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "cargoVersion": "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "chromiumExecutable": null
+  },
+  "variants": [
+    {
+      "id": "react-reference",
+      "role": "reference",
+      "label": "React/Expo reference",
+      "sourceRoot": "<react-reference-worktree>",
+      "commit": "6e5bbacd2277b564a901e1eb4f48b566a1283802",
+      "expectedCommit": "6e5bbacd2277b564a901e1eb4f48b566a1283802",
+      "commitMatchesExpectation": true,
+      "statusPorcelain": [
+        "?? bun.lock",
+        "?? packages/frontend/dist-reference/"
+      ],
+      "buildCommand": "bunx expo export --platform web --output-dir dist-reference",
+      "bundleDirectory": "<react-reference-worktree>/packages/frontend/dist-reference",
+      "pageBaseUrl": "http://127.0.0.1:8081",
+      "apiBaseUrl": "http://127.0.0.1:8787"
+    },
+    {
+      "id": "dioxus-poc",
+      "role": "candidate",
+      "label": "Dioxus Rust POC",
+      "sourceRoot": "<dioxus-poc-worktree>",
+      "commit": "eb4777714d6174393e8a7e1dbf0f864488810f4f",
+      "expectedCommit": null,
+      "commitMatchesExpectation": null,
+      "statusPorcelain": [],
+      "buildCommand": "dx build --web --release",
+      "bundleDirectory": "<dioxus-poc-worktree>/target/dx/janata-ui/release/web/public",
+      "pageBaseUrl": "http://127.0.0.1:8082",
+      "apiBaseUrl": "http://127.0.0.1:8788"
+    }
+  ],
+  "caveats": [
+    "A dirty source status is recorded rather than silently ignored because build outputs may be untracked.",
+    "Environment capture does not prove equivalent application data or authenticated state; the operator must verify both."
+  ]
+}

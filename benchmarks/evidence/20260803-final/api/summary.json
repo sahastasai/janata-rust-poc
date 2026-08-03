@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-03T20:09:02.530Z",
+  "configSha256": "785fc38db2dda2204b335e7856ce0e11626e14217927baaa63fd370049c17b8e",
+  "profile": {
+    "runs": 3,
+    "durationSeconds": 10,
+    "concurrency": 20,
+    "maxRequests": 3000,
+    "warmupRequests": 20
+  },
+  "runSummaries": [
+    {
+      "variantId": "react-reference",
+      "variantLabel": "React/Expo reference",
+      "role": "reference",
+      "scenarioId": "health",
+      "run": 1,
+      "wallTimeMs": 2111.001864,
+      "attemptedRequests": 3000,
+      "expectedStatusRequests": 3000,
+      "unexpectedStatusRequests": 0,
+      "networkErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 1421.1261729136968,
+      "responseBytes": 309000,
+      "latencyMs": {
+        "count": 3000,
+        "min": 5.472586000000092,
+        "median": 12.608490999999958,
+        "p75": 16.063665000000128,
+        "p95": 23.46058600000015,
+        "p99": 33.843961000000036,
+        "max": 60.77795499999979,
+        "mean": 14.04770213466664
+      }
+    },
+    {
+      "variantId": "dioxus-poc",
+      "variantLabel": "Dioxus Rust POC",
+      "role": "candidate",
+      "scenarioId": "health",
+      "run": 1,
+      "wallTimeMs": 10175.043779,
+      "attemptedRequests": 1308,
+      "expectedStatusRequests": 1308,
+      "unexpectedStatusRequests": 0,
+      "networkErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 128.54981545136408,
+      "responseBytes": 168732,
+      "latencyMs": {
+        "count": 1308,
+        "min": 13.013882000000194,
+        "median": 127.13895600000069,
+        "p75": 169.89054600000009,
+        "p95": 258.2566489999999,
+        "p99": 281.0522230000006,
+        "max": 304.35206300000027,
+        "mean": 154.34828758715594
+      }
+    },
+    {
+      "variantId": "dioxus-poc",
+      "variantLabel": "Dioxus Rust POC",
+      "role": "candidate",
+      "scenarioId": "health",
+      "run": 2,
+      "wallTimeMs": 10134.590236,
+      "attemptedRequests": 1284,
+      "expectedStatusRequests": 1284,
+      "unexpectedStatusRequests": 0,
+      "networkErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 126.69481154146587,
+      "responseBytes": 165636,
+      "latencyMs": {
+        "count": 1284,
+        "min": 10.358768000000055,
+        "median": 131.72929799999838,
+        "p75": 154.80822900000203,
+        "p95": 264.6367620000019,
+        "p99": 274.7348129999991,
+        "max": 296.0293980000024,
+        "mean": 156.82906877803737
+      }
+    },
+    {
+      "variantId": "react-reference",
+      "variantLabel": "React/Expo reference",
+      "role": "reference",
+      "scenarioId": "health",
+      "run": 2,
+      "wallTimeMs": 2144.249108,
+      "attemptedRequests": 3000,
+      "expectedStatusRequests": 3000,
+      "unexpectedStatusRequests": 0,
+      "networkErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 1399.091173132483,
+      "responseBytes": 309000,
+      "latencyMs": {
+        "count": 3000,
+        "min": 4.164500999999291,
+        "median": 12.734881000000314,
+        "p75": 16.036424000001716,
+        "p95": 24.334365999999136,
+        "p99": 29.34607700000197,
+        "max": 48.171048000000155,
+        "mean": 14.281034411333318
+      }
+    },
+    {
+      "variantId": "react-reference",
+      "variantLabel": "React/Expo reference",
+      "role": "reference",
+      "scenarioId": "health",
+      "run": 3,
+      "wallTimeMs": 2196.746800000001,
+      "attemptedRequests": 3000,
+      "expectedStatusRequests": 3000,
+      "unexpectedStatusRequests": 0,
+      "networkErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 1365.655796107225,
+      "responseBytes": 309000,
+      "latencyMs": {
+        "count": 3000,
+        "min": 4.446576999998797,
+        "median": 12.737726999999722,
+        "p75": 15.75341599999956,
+        "p95": 27.194400000000314,
+        "p99": 37.12922299999991,
+        "max": 60.19105100000161,
+        "mean": 14.625825718666674
+      }
+    },
+    {
+      "variantId": "dioxus-poc",
+      "variantLabel": "Dioxus Rust POC",
+      "role": "candidate",
+      "scenarioId": "health",
+      "run": 3,
+      "wallTimeMs": 10133.679319000003,
+      "attemptedRequests": 1277,
+      "expectedStatusRequests": 1277,
+      "unexpectedStatusRequests": 0,
+      "networkErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": 126.01543425651002,
+      "responseBytes": 164733,
+      "latencyMs": {
+        "count": 1277,
+        "min": 27.441107999999076,
+        "median": 129.00440399999934,
+        "p75": 170.77518200000122,
+        "p95": 262.8701599999986,
+        "p99": 290.5090060000002,
+        "max": 303.2147890000015,
+        "mean": 157.45946176664052
+      }
+    }
+  ],
+  "aggregates": [
+    {
+      "variantId": "react-reference",
+      "variantLabel": "React/Expo reference",
+      "role": "reference",
+      "scenarioId": "health",
+      "runCount": 3,
+      "attemptedRequests": 9000,
+      "expectedStatusRequests": 9000,
+      "unexpectedStatusRequests": 0,
+      "networkErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": {
+        "count": 3,
+        "min": 1365.655796107225,
+        "median": 1399.091173132483,
+        "p75": 1421.1261729136968,
+        "p95": 1421.1261729136968,
+        "p99": 1421.1261729136968,
+        "max": 1421.1261729136968,
+        "mean": 1395.2910473844684
+      },
+      "latencyMs": {
+        "count": 9000,
+        "min": 4.164500999999291,
+        "median": 12.702620000000024,
+        "p75": 16.01886999999988,
+        "p95": 25.15851200000003,
+        "p99": 35.02293099999952,
+        "max": 60.77795499999979,
+        "mean": 14.318187421555567
+      },
+      "responseBytes": 927000
+    },
+    {
+      "variantId": "dioxus-poc",
+      "variantLabel": "Dioxus Rust POC",
+      "role": "candidate",
+      "scenarioId": "health",
+      "runCount": 3,
+      "attemptedRequests": 3869,
+      "expectedStatusRequests": 3869,
+      "unexpectedStatusRequests": 0,
+      "networkErrors": 0,
+      "errorRate": 0,
+      "requestsPerSecond": {
+        "count": 3,
+        "min": 126.01543425651002,
+        "median": 126.69481154146587,
+        "p75": 128.54981545136408,
+        "p95": 128.54981545136408,
+        "p99": 128.54981545136408,
+        "max": 128.54981545136408,
+        "mean": 127.08668708311332
+      },
+      "latencyMs": {
+        "count": 3869,
+        "min": 10.358768000000055,
+        "median": 128.74618300000293,
+        "p75": 170.02421000000004,
+        "p95": 261.68785899999966,
+        "p99": 289.148205999998,
+        "max": 304.35206300000027,
+        "mean": 156.19845364461133
+      },
+      "responseBytes": 499101
+    }
+  ],
+  "notes": [
+    "Targets were validated as loopback before requests were issued.",
+    "Fixed-concurrency local throughput is not a production capacity guarantee.",
+    "Raw evidence excludes configured request headers and bodies."
+  ]
+}

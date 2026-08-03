@@ -1,0 +1,685 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-03T20:08:24.124Z",
+  "configSha256": "785fc38db2dda2204b335e7856ce0e11626e14217927baaa63fd370049c17b8e",
+  "browserVersion": "145.0.7632.6",
+  "profile": {
+    "runs": 30,
+    "cacheModes": [
+      "cold",
+      "warm"
+    ],
+    "settleMs": 750,
+    "navigationTimeoutMs": 30000,
+    "cpuThrottleRate": 1,
+    "network": {
+      "latencyMs": 0,
+      "downloadKbps": 0,
+      "uploadKbps": 0
+    },
+    "routes": [
+      {
+        "id": "landing",
+        "path": "/"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "variantId": "react-reference",
+      "variantLabel": "React/Expo reference",
+      "role": "reference",
+      "routeId": "landing",
+      "path": "/",
+      "cacheMode": "cold",
+      "attemptedRuns": 30,
+      "successfulRuns": 30,
+      "failedRuns": 0,
+      "metrics": {
+        "ttfbMs": {
+          "count": 30,
+          "min": 1.2999999970197678,
+          "median": 1.8999999910593033,
+          "p75": 2.1000000089406967,
+          "p95": 2.5,
+          "p99": 6.200000002980232,
+          "max": 6.200000002980232,
+          "mean": 1.9833333338300387
+        },
+        "fcpMs": {
+          "count": 27,
+          "min": 568,
+          "median": 748,
+          "p75": 904,
+          "p95": 1156,
+          "p99": 1456,
+          "max": 1456,
+          "mean": 780.4444444444445
+        },
+        "lcpMs": {
+          "count": 27,
+          "min": 568,
+          "median": 748,
+          "p75": 904,
+          "p95": 1156,
+          "p99": 1456,
+          "max": 1456,
+          "mean": 780.4444444444445
+        },
+        "cls": {
+          "count": 30,
+          "min": 0,
+          "median": 0,
+          "p75": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "tbtMs": {
+          "count": 30,
+          "min": 130,
+          "median": 148,
+          "p75": 159,
+          "p95": 177,
+          "p99": 180,
+          "max": 180,
+          "mean": 149.3
+        },
+        "observedInteractionLatencyMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p75": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "domContentLoadedMs": {
+          "count": 30,
+          "min": 240.19999998807907,
+          "median": 309.70000000298023,
+          "p75": 402.5,
+          "p95": 716.5,
+          "p99": 837.5,
+          "max": 837.5,
+          "mean": 364.9266666665673
+        },
+        "loadMs": {
+          "count": 30,
+          "min": 240.8999999910593,
+          "median": 310.5,
+          "p75": 403.29999999701977,
+          "p95": 717.2999999970198,
+          "p99": 838.4000000059605,
+          "max": 838.4000000059605,
+          "mean": 365.720000000298
+        },
+        "transferBytes": {
+          "count": 30,
+          "min": 5367538,
+          "median": 5367538,
+          "p75": 5367538,
+          "p95": 5367538,
+          "p99": 5367538,
+          "max": 5367538,
+          "mean": 5367538
+        },
+        "encodedBodyBytes": {
+          "count": 30,
+          "min": 5363338,
+          "median": 5363338,
+          "p75": 5363338,
+          "p95": 5363338,
+          "p99": 5363338,
+          "max": 5363338,
+          "mean": 5363338
+        },
+        "decodedBodyBytes": {
+          "count": 30,
+          "min": 5369265,
+          "median": 5369265,
+          "p75": 5369265,
+          "p95": 5369265,
+          "p99": 5369265,
+          "max": 5369265,
+          "mean": 5369265
+        },
+        "javascriptTransferBytes": {
+          "count": 30,
+          "min": 4577090,
+          "median": 4577090,
+          "p75": 4577090,
+          "p95": 4577090,
+          "p99": 4577090,
+          "max": 4577090,
+          "mean": 4577090
+        },
+        "wasmTransferBytes": {
+          "count": 30,
+          "min": 0,
+          "median": 0,
+          "p75": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "usedJsHeapBytes": {
+          "count": 30,
+          "min": 21700000,
+          "median": 21700000,
+          "p75": 21700000,
+          "p95": 21700000,
+          "p99": 21700000,
+          "max": 21700000,
+          "mean": 21700000
+        },
+        "resourceCount": {
+          "count": 30,
+          "min": 13,
+          "median": 14,
+          "p75": 14,
+          "p95": 14,
+          "p99": 14,
+          "max": 14,
+          "mean": 13.766666666666667
+        }
+      }
+    },
+    {
+      "variantId": "react-reference",
+      "variantLabel": "React/Expo reference",
+      "role": "reference",
+      "routeId": "landing",
+      "path": "/",
+      "cacheMode": "warm",
+      "attemptedRuns": 30,
+      "successfulRuns": 30,
+      "failedRuns": 0,
+      "metrics": {
+        "ttfbMs": {
+          "count": 30,
+          "min": 1.1000000089406967,
+          "median": 1.5,
+          "p75": 1.7000000029802322,
+          "p95": 2,
+          "p99": 2.1000000089406967,
+          "max": 2.1000000089406967,
+          "mean": 1.5533333336313566
+        },
+        "fcpMs": {
+          "count": 30,
+          "min": 280,
+          "median": 368,
+          "p75": 424,
+          "p95": 528,
+          "p99": 772,
+          "max": 772,
+          "mean": 389.8666666666667
+        },
+        "lcpMs": {
+          "count": 30,
+          "min": 280,
+          "median": 368,
+          "p75": 424,
+          "p95": 528,
+          "p99": 772,
+          "max": 772,
+          "mean": 389.8666666666667
+        },
+        "cls": {
+          "count": 30,
+          "min": 0,
+          "median": 0,
+          "p75": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "tbtMs": {
+          "count": 30,
+          "min": 42,
+          "median": 46,
+          "p75": 48,
+          "p95": 53,
+          "p99": 55,
+          "max": 55,
+          "mean": 46.666666666666664
+        },
+        "observedInteractionLatencyMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p75": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "domContentLoadedMs": {
+          "count": 30,
+          "min": 100.09999999403954,
+          "median": 104.8999999910593,
+          "p75": 107.6000000089407,
+          "p95": 113.3999999910593,
+          "p99": 116.1000000089407,
+          "max": 116.1000000089407,
+          "mean": 105.52999999870856
+        },
+        "loadMs": {
+          "count": 30,
+          "min": 100.8999999910593,
+          "median": 105.59999999403954,
+          "p75": 108.5,
+          "p95": 114.5,
+          "p99": 117,
+          "max": 117,
+          "mean": 106.37333333392938
+        },
+        "transferBytes": {
+          "count": 30,
+          "min": 692605,
+          "median": 692605,
+          "p75": 692605,
+          "p95": 692605,
+          "p99": 692605,
+          "max": 692605,
+          "mean": 692605
+        },
+        "encodedBodyBytes": {
+          "count": 30,
+          "min": 5363338,
+          "median": 5363338,
+          "p75": 5363338,
+          "p95": 5363338,
+          "p99": 5363338,
+          "max": 5363338,
+          "mean": 5363338
+        },
+        "decodedBodyBytes": {
+          "count": 30,
+          "min": 5369265,
+          "median": 5369265,
+          "p75": 5369265,
+          "p95": 5369265,
+          "p99": 5369265,
+          "max": 5369265,
+          "mean": 5369265
+        },
+        "javascriptTransferBytes": {
+          "count": 30,
+          "min": 0,
+          "median": 0,
+          "p75": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "wasmTransferBytes": {
+          "count": 30,
+          "min": 0,
+          "median": 0,
+          "p75": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "usedJsHeapBytes": {
+          "count": 30,
+          "min": 29400000,
+          "median": 31200000,
+          "p75": 31200000,
+          "p95": 31200000,
+          "p99": 31200000,
+          "max": 31200000,
+          "mean": 31140000
+        },
+        "resourceCount": {
+          "count": 30,
+          "min": 14,
+          "median": 14,
+          "p75": 14,
+          "p95": 14,
+          "p99": 14,
+          "max": 14,
+          "mean": 14
+        }
+      }
+    },
+    {
+      "variantId": "dioxus-poc",
+      "variantLabel": "Dioxus Rust POC",
+      "role": "candidate",
+      "routeId": "landing",
+      "path": "/",
+      "cacheMode": "cold",
+      "attemptedRuns": 30,
+      "successfulRuns": 30,
+      "failedRuns": 0,
+      "metrics": {
+        "ttfbMs": {
+          "count": 30,
+          "min": 1.2999999970197678,
+          "median": 1.7999999970197678,
+          "p75": 2,
+          "p95": 2.5,
+          "p99": 4.600000008940697,
+          "max": 4.600000008940697,
+          "mean": 1.9100000003973643
+        },
+        "fcpMs": {
+          "count": 30,
+          "min": 40,
+          "median": 52,
+          "p75": 56,
+          "p95": 80,
+          "p99": 84,
+          "max": 84,
+          "mean": 54.266666666666666
+        },
+        "lcpMs": {
+          "count": 30,
+          "min": 124,
+          "median": 156,
+          "p75": 164,
+          "p95": 192,
+          "p99": 248,
+          "max": 248,
+          "mean": 157.33333333333334
+        },
+        "cls": {
+          "count": 30,
+          "min": 0.0006298014322916667,
+          "median": 0.18500480143229167,
+          "p75": 0.18500480143229167,
+          "p95": 0.18500480143229167,
+          "p99": 0.18500480143229167,
+          "max": 0.18500480143229167,
+          "mean": 0.1788589680989583
+        },
+        "tbtMs": {
+          "count": 30,
+          "min": 0,
+          "median": 0,
+          "p75": 0,
+          "p95": 0,
+          "p99": 28,
+          "max": 28,
+          "mean": 0.9333333333333333
+        },
+        "observedInteractionLatencyMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p75": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "domContentLoadedMs": {
+          "count": 30,
+          "min": 7.5999999940395355,
+          "median": 11.599999994039536,
+          "p75": 14.5,
+          "p95": 16.899999991059303,
+          "p99": 17,
+          "max": 17,
+          "mean": 12.066666664679845
+        },
+        "loadMs": {
+          "count": 30,
+          "min": 10.699999988079071,
+          "median": 15,
+          "p75": 17.899999991059303,
+          "p95": 20.400000005960464,
+          "p99": 21,
+          "max": 21,
+          "mean": 15.353333332637947
+        },
+        "transferBytes": {
+          "count": 30,
+          "min": 2532522,
+          "median": 2532522,
+          "p75": 2532522,
+          "p95": 2532522,
+          "p99": 2532522,
+          "max": 2532522,
+          "mean": 2532522
+        },
+        "encodedBodyBytes": {
+          "count": 30,
+          "min": 2529822,
+          "median": 2529822,
+          "p75": 2529822,
+          "p95": 2529822,
+          "p99": 2529822,
+          "max": 2529822,
+          "mean": 2529822
+        },
+        "decodedBodyBytes": {
+          "count": 30,
+          "min": 2529822,
+          "median": 2529822,
+          "p75": 2529822,
+          "p95": 2529822,
+          "p99": 2529822,
+          "max": 2529822,
+          "mean": 2529822
+        },
+        "javascriptTransferBytes": {
+          "count": 30,
+          "min": 35151,
+          "median": 35151,
+          "p75": 35151,
+          "p95": 35151,
+          "p99": 35151,
+          "max": 35151,
+          "mean": 35151
+        },
+        "wasmTransferBytes": {
+          "count": 30,
+          "min": 387513,
+          "median": 387513,
+          "p75": 387513,
+          "p95": 387513,
+          "p99": 387513,
+          "max": 387513,
+          "mean": 387513
+        },
+        "usedJsHeapBytes": {
+          "count": 30,
+          "min": 10000000,
+          "median": 10000000,
+          "p75": 10000000,
+          "p95": 10000000,
+          "p99": 10000000,
+          "max": 10000000,
+          "mean": 10000000
+        },
+        "resourceCount": {
+          "count": 30,
+          "min": 8,
+          "median": 8,
+          "p75": 8,
+          "p95": 8,
+          "p99": 8,
+          "max": 8,
+          "mean": 8
+        }
+      }
+    },
+    {
+      "variantId": "dioxus-poc",
+      "variantLabel": "Dioxus Rust POC",
+      "role": "candidate",
+      "routeId": "landing",
+      "path": "/",
+      "cacheMode": "warm",
+      "attemptedRuns": 30,
+      "successfulRuns": 30,
+      "failedRuns": 0,
+      "metrics": {
+        "ttfbMs": {
+          "count": 30,
+          "min": 0.8999999910593033,
+          "median": 1.4000000059604645,
+          "p75": 1.699999988079071,
+          "p95": 2.0999999940395355,
+          "p99": 2.2000000029802322,
+          "max": 2.2000000029802322,
+          "mean": 1.4966666653752327
+        },
+        "fcpMs": {
+          "count": 30,
+          "min": 40,
+          "median": 48,
+          "p75": 60,
+          "p95": 136,
+          "p99": 144,
+          "max": 144,
+          "mean": 60.53333333333333
+        },
+        "lcpMs": {
+          "count": 30,
+          "min": 124,
+          "median": 136,
+          "p75": 148,
+          "p95": 172,
+          "p99": 192,
+          "max": 192,
+          "mean": 142.26666666666668
+        },
+        "cls": {
+          "count": 30,
+          "min": 0.0006298014322916667,
+          "median": 0.18500480143229167,
+          "p75": 0.18500480143229167,
+          "p95": 0.18500480143229167,
+          "p99": 0.18500480143229167,
+          "max": 0.18500480143229167,
+          "mean": 0.16042146809895833
+        },
+        "tbtMs": {
+          "count": 30,
+          "min": 0,
+          "median": 3,
+          "p75": 9,
+          "p95": 24,
+          "p99": 25,
+          "max": 25,
+          "mean": 6.466666666666667
+        },
+        "observedInteractionLatencyMs": {
+          "count": 0,
+          "min": null,
+          "median": null,
+          "p75": null,
+          "p95": null,
+          "p99": null,
+          "max": null,
+          "mean": null
+        },
+        "domContentLoadedMs": {
+          "count": 30,
+          "min": 6.4000000059604645,
+          "median": 8.400000005960464,
+          "p75": 10,
+          "p95": 12.200000002980232,
+          "p99": 12.200000002980232,
+          "max": 12.200000002980232,
+          "mean": 8.8
+        },
+        "loadMs": {
+          "count": 30,
+          "min": 7.9000000059604645,
+          "median": 9.799999997019768,
+          "p75": 12.100000008940697,
+          "p95": 14,
+          "p99": 14.700000002980232,
+          "max": 14.700000002980232,
+          "mean": 10.679999999701977
+        },
+        "transferBytes": {
+          "count": 30,
+          "min": 2109858,
+          "median": 2497371,
+          "p75": 2497371,
+          "p95": 2497371,
+          "p99": 2497371,
+          "max": 2497371,
+          "mean": 2329448.7
+        },
+        "encodedBodyBytes": {
+          "count": 30,
+          "min": 2529822,
+          "median": 2529822,
+          "p75": 2529822,
+          "p95": 2529822,
+          "p99": 2529822,
+          "max": 2529822,
+          "mean": 2529822
+        },
+        "decodedBodyBytes": {
+          "count": 30,
+          "min": 2529822,
+          "median": 2529822,
+          "p75": 2529822,
+          "p95": 2529822,
+          "p99": 2529822,
+          "max": 2529822,
+          "mean": 2529822
+        },
+        "javascriptTransferBytes": {
+          "count": 30,
+          "min": 0,
+          "median": 0,
+          "p75": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0,
+          "mean": 0
+        },
+        "wasmTransferBytes": {
+          "count": 30,
+          "min": 0,
+          "median": 387513,
+          "p75": 387513,
+          "p95": 387513,
+          "p99": 387513,
+          "max": 387513,
+          "mean": 219590.7
+        },
+        "usedJsHeapBytes": {
+          "count": 30,
+          "min": 10000000,
+          "median": 10000000,
+          "p75": 10000000,
+          "p95": 10000000,
+          "p99": 10000000,
+          "max": 10000000,
+          "mean": 10000000
+        },
+        "resourceCount": {
+          "count": 30,
+          "min": 8,
+          "median": 8,
+          "p75": 8,
+          "p95": 8,
+          "p99": 8,
+          "max": 8,
+          "mean": 8
+        }
+      }
+    }
+  ],
+  "notes": [
+    "observedInteractionLatencyMs is the largest Event Timing interaction observed after the configured synthetic action; it is not field INP.",
+    "usedJsHeapBytes is Chromium performance.memory and does not independently report WASM linear memory."
+  ]
+}

@@ -373,25 +373,25 @@ pub(crate) fn Benchmarks() -> Element {
                             tr {
                                 th { scope: "row", "Logical release output · raw" }
                                 td { class: "evidence-number", "17,051,891 B" }
-                                td { class: "evidence-number", "2,523,828 B" }
+                                td { class: "evidence-number", "2,529,822 B" }
                                 td { span { class: "result result-dioxus", "Dioxus smaller" } }
                             }
                             tr {
                                 th { scope: "row", "Logical release output · Brotli estimate" }
                                 td { class: "evidence-number", "12,390,855 B" }
-                                td { class: "evidence-number", "2,221,165 B" }
+                                td { class: "evidence-number", "2,222,940 B" }
                                 td { span { class: "result result-dioxus", "Dioxus smaller" } }
                             }
                             tr {
                                 th { scope: "row", "Landing LCP · cold median" }
-                                td { class: "evidence-number", "756 ms" }
-                                td { class: "evidence-number", "144 ms" }
+                                td { class: "evidence-number", "748 ms" }
+                                td { class: "evidence-number", "156 ms" }
                                 td { span { class: "result result-dioxus", "Dioxus lower" } }
                             }
                             tr {
                                 th { scope: "row", "Landing LCP · warm median" }
-                                td { class: "evidence-number", "620 ms" }
-                                td { class: "evidence-number", "140 ms" }
+                                td { class: "evidence-number", "368 ms" }
+                                td { class: "evidence-number", "136 ms" }
                                 td { span { class: "result result-dioxus", "Dioxus lower" } }
                             }
                         }
@@ -420,14 +420,14 @@ pub(crate) fn Benchmarks() -> Element {
                         tbody {
                             tr {
                                 th { scope: "row", "Health throughput" }
-                                td { class: "evidence-number", "~1,400 req/s" }
-                                td { class: "evidence-number", "~129 req/s" }
+                                td { class: "evidence-number", "1,399.1 req/s" }
+                                td { class: "evidence-number", "126.7 req/s" }
                                 td { span { class: "result result-react", "Hono higher" } }
                             }
                             tr {
                                 th { scope: "row", "Health p95 latency" }
-                                td { class: "evidence-number", "~25 ms" }
-                                td { class: "evidence-number", "~259 ms" }
+                                td { class: "evidence-number", "25.2 ms" }
+                                td { class: "evidence-number", "261.7 ms" }
                                 td { span { class: "result result-react", "Hono lower" } }
                             }
                         }
