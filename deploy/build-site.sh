@@ -26,10 +26,14 @@ esac
 (cd "$repo_root" && mdbook build docs/book)
 (cd "$repo_root" && RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps)
 
-# `dist` is ignored, generated POC output. Keep the deletion narrowly scoped
-# to this one staging directory so repeated builds cannot retain stale assets.
+# `dist` is ignored, generated POC output. Clear only the exact staging
+# directory so removed docs/evidence (including compressed files) cannot linger.
+case "$site_output" in
+  "$repo_root"/dist/site) rm -rf -- "$site_output" ;;
+  *) echo "Refusing to clear unexpected site output: $site_output" >&2; exit 1 ;;
+esac
 mkdir -p "$site_output"
-rsync -a --delete --exclude '*.br' --exclude '*.gz' "$ui_output/" "$site_output/"
+rsync -a --exclude '*.br' --exclude '*.gz' "$ui_output/" "$site_output/"
 mkdir -p "$site_output/docs"
 rsync -a --delete "$repo_root/dist/docs/guide/" "$site_output/docs/guide/"
 rsync -a --delete "$repo_root/target/doc/" "$site_output/docs/api/"

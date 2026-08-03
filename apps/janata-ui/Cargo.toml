@@ -8,10 +8,13 @@ repository.workspace = true
 
 [features]
 default = ["web"]
-web = ["dioxus/web"]
+# The document feature installs WebHistory. Without it the router silently uses
+# in-memory history, so direct links such as `/benchmarks` render the home page.
+web = ["dioxus/web", "dioxus/document", "dep:web-sys"]
 mobile = ["dioxus/mobile"]
 
 [dependencies]
 dioxus = { workspace = true, features = ["asset", "router"] }
 janata-api-contract = { path = "../../crates/api-contract" }
 janata-domain = { path = "../../crates/domain" }
+web-sys = { version = "0.3", optional = true, features = ["Location"] }
