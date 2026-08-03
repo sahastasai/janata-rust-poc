@@ -2760,9 +2760,14 @@ dependencies = [
 name = "janata-worker-api"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "futures-util",
  "janata-api-contract",
  "janata-domain",
+ "serde",
  "serde_json",
+ "subtle",
+ "web-sys",
  "worker",
 ]
 

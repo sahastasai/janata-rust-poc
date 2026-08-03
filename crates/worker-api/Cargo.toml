@@ -12,5 +12,10 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 janata-api-contract = { path = "../api-contract" }
 janata-domain = { path = "../domain" }
+base64 = "0.22.1"
+futures-util = "0.3.31"
+serde.workspace = true
 serde_json.workspace = true
-worker = "=0.8.5"
+subtle = "2.6.1"
+web-sys = { version = "0.3.103", features = ["Crypto", "CryptoKey", "Pbkdf2Params", "SubtleCrypto"] }
+worker = { version = "=0.8.5", features = ["d1"] }

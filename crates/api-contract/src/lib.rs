@@ -3,7 +3,7 @@
 //! Contracts deliberately use domain types instead of loose JSON maps. This
 //! makes breaking changes visible to the compiler and documentation generator.
 
-use janata_domain::{BoardPost, Center, Event, Notification, UserProfile};
+use janata_domain::{BoardPost, Center, Event, Notification};
 use serde::{Deserialize, Serialize};
 
 /// Successful health response returned by `GET /api/health`.
@@ -47,26 +47,90 @@ pub struct Page<T> {
     pub next_cursor: Option<String>,
 }
 
-/// Credentials submitted to the authentication endpoint.
+/// Credentials submitted to the browser authentication endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AuthenticateRequest {
-    /// Email address or username.
+    /// Normalized email address. The server still normalizes and validates it.
     pub login: String,
     /// User-entered password; never logged or persisted in this representation.
     pub password: String,
 }
 
-/// Session summary returned after authentication or token refresh.
+/// Invite presented before an invite-only registration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ValidateInviteRequest {
+    /// Opaque invite code. The Worker hashes it before querying D1.
+    pub code: String,
+}
+
+/// Result of checking an invite without consuming it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InviteValidationResponse {
+    /// Whether the code is active, unexpired, and has remaining uses.
+    pub valid: bool,
+    /// Optional public inviter display name; absent for cohort invites.
+    pub inviter_name: Option<String>,
+}
+
+/// Invite-gated account registration request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterRequest {
+    /// Email address, normalized again by the server.
+    pub email: String,
+    /// Public member name used by the authenticated greeting.
+    pub display_name: String,
+    /// User-entered password; bounded and hashed inside the Worker.
+    pub password: String,
+    /// Opaque invite code consumed atomically with account creation.
+    pub invite_code: String,
+}
+
+/// Successful account registration response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegisterResponse {
+    /// True only after the user and invite-use updates commit.
+    pub registered: bool,
+    /// Normalized email associated with the new account.
+    pub email: String,
+}
+
+/// Minimal authenticated identity safe to return to the browser.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionUser {
+    /// Immutable account identifier.
+    pub id: String,
+    /// Normalized account email.
+    pub email: String,
+    /// Public display name.
+    pub display_name: String,
+    /// Explicit verification tier carried by the account.
+    pub verification_level: i32,
+    /// Named role; authorization must still check capabilities server-side.
+    pub role: String,
+}
+
+/// Browser session summary. Opaque session and CSRF tokens are never JSON.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionResponse {
-    /// Authenticated member profile.
-    pub user: UserProfile,
-    /// CSRF token for cookie-authenticated web mutations.
-    pub csrf_token: Option<String>,
-    /// Short-lived bearer token used only by native clients.
-    pub native_access_token: Option<String>,
+    /// True when the HttpOnly cookie resolves to an active D1 session.
+    pub authenticated: bool,
+    /// Authenticated member identity, absent for guests.
+    pub user: Option<SessionUser>,
+}
+
+/// Successful logout response.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogoutResponse {
+    /// True after the current session row has been revoked.
+    pub logged_out: bool,
 }
 
 /// Combined discovery payload used by responsive list/map experiences.
@@ -171,6 +235,36 @@ pub const FOUNDATION_ENDPOINTS: &[EndpointSpec] = &[
         authorization: "public",
         summary: "Read one public event",
     },
+    EndpointSpec {
+        method: "POST",
+        path: "/api/v1/auth/invite/validate",
+        authorization: "public + exact browser origin",
+        summary: "Validate an opaque invite without consuming it",
+    },
+    EndpointSpec {
+        method: "POST",
+        path: "/api/v1/auth/register",
+        authorization: "public + exact browser origin",
+        summary: "Create an invite-gated local POC account",
+    },
+    EndpointSpec {
+        method: "POST",
+        path: "/api/v1/auth/login",
+        authorization: "public + exact browser origin",
+        summary: "Create a revocable HttpOnly web session",
+    },
+    EndpointSpec {
+        method: "GET",
+        path: "/api/v1/auth/session",
+        authorization: "optional HttpOnly web session",
+        summary: "Resolve the current guest or member session",
+    },
+    EndpointSpec {
+        method: "POST",
+        path: "/api/v1/auth/logout",
+        authorization: "web session + exact origin + CSRF",
+        summary: "Revoke the current web session and clear cookies",
+    },
 ];
 
 #[cfg(test)]
@@ -233,5 +327,24 @@ mod tests {
             serde_json::from_str(&encoded).expect("detail should deserialize");
         assert_eq!(decoded.center.member_count, 108);
         assert!(decoded.events.items.is_empty());
+    }
+
+    #[test]
+    fn session_contract_never_serializes_credentials() {
+        let response = SessionResponse {
+            authenticated: true,
+            user: Some(SessionUser {
+                id: "user-1".to_owned(),
+                email: "member@example.test".to_owned(),
+                display_name: "Member".to_owned(),
+                verification_level: 45,
+                role: "member".to_owned(),
+            }),
+        };
+        let value = serde_json::to_value(response).expect("session should serialize");
+        assert_eq!(value["authenticated"], true);
+        assert!(value.get("token").is_none());
+        assert!(value.get("csrfToken").is_none());
+        assert!(value.get("nativeAccessToken").is_none());
     }
 }

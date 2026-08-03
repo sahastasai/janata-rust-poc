@@ -4,6 +4,7 @@
 //! query validation, deterministic seed construction, pagination, CORS, and
 //! cache choices remain ordinary Rust so contributors can test them on a host.
 
+mod auth;
 mod query;
 mod seed;
 
@@ -28,6 +29,8 @@ pub const SERVICE_NAME: &str = "janata-rust-poc";
 /// development on their conventional ports.
 pub const ALLOWED_ORIGINS: &[&str] = &[
     "https://cmrust.sahasta.com",
+    "https://localhost:8787",
+    "https://127.0.0.1:8787",
     "http://localhost:8080",
     "http://127.0.0.1:8080",
     "http://localhost:8787",
@@ -48,7 +51,12 @@ const COMPAT_EVENTS_PATH: &str = "/api/fetchAllEvents";
 const COMPAT_CENTER_PATH: &str = "/api/fetchCenter";
 const COMPAT_EVENT_PATH: &str = "/api/fetchEvent";
 const COMPAT_CENTER_EVENTS_PATH: &str = "/api/fetchEventsByCenter";
-const ALLOWED_REQUEST_HEADERS: &[&str] = &["content-type", "x-request-id"];
+const AUTH_VALIDATE_INVITE_PATH: &str = "/api/v1/auth/invite/validate";
+const AUTH_REGISTER_PATH: &str = "/api/v1/auth/register";
+const AUTH_LOGIN_PATH: &str = "/api/v1/auth/login";
+const AUTH_SESSION_PATH: &str = "/api/v1/auth/session";
+const AUTH_LOGOUT_PATH: &str = "/api/v1/auth/logout";
+const ALLOWED_REQUEST_HEADERS: &[&str] = &["content-type", "x-csrf-token", "x-request-id"];
 
 /// Result of matching an HTTP method and path against the POC API surface.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -81,9 +89,19 @@ pub enum ApiRoute {
     CompatibilityEvent,
     /// Compatibility `GET /api/fetchEventsByCenter?centerID=`.
     CompatibilityCenterEvents,
-    /// CORS preflight for an existing read route.
+    /// `POST /api/v1/auth/invite/validate`.
+    AuthValidateInvite,
+    /// `POST /api/v1/auth/register`.
+    AuthRegister,
+    /// `POST /api/v1/auth/login`.
+    AuthLogin,
+    /// `GET /api/v1/auth/session`.
+    AuthSession,
+    /// `POST /api/v1/auth/logout`.
+    AuthLogout,
+    /// CORS preflight for an existing route.
     Preflight,
-    /// A known read path requested with a method this POC rejects.
+    /// A known path requested with a method this POC rejects.
     MethodNotAllowed,
     /// Any method/path pair not explicitly exposed by this POC.
     NotFound,
@@ -157,6 +175,13 @@ impl HttpProblem {
 /// segment; canonical UUID validation happens before lookup in the handler.
 #[must_use]
 pub fn classify_route(method: &str, path: &str) -> ApiRoute {
+    if let Some((route, expected_method)) = classify_auth_path(path) {
+        return match method {
+            actual if actual == expected_method => route,
+            "OPTIONS" => ApiRoute::Preflight,
+            _ => ApiRoute::MethodNotAllowed,
+        };
+    }
     let read_route = classify_read_path(path);
     match method {
         "GET" => read_route,
@@ -164,6 +189,23 @@ pub fn classify_route(method: &str, path: &str) -> ApiRoute {
         _ if read_route != ApiRoute::NotFound => ApiRoute::MethodNotAllowed,
         _ => ApiRoute::NotFound,
     }
+}
+
+fn classify_auth_path(path: &str) -> Option<(ApiRoute, &'static str)> {
+    match path {
+        AUTH_VALIDATE_INVITE_PATH => Some((ApiRoute::AuthValidateInvite, "POST")),
+        AUTH_REGISTER_PATH => Some((ApiRoute::AuthRegister, "POST")),
+        AUTH_LOGIN_PATH => Some((ApiRoute::AuthLogin, "POST")),
+        AUTH_SESSION_PATH => Some((ApiRoute::AuthSession, "GET")),
+        AUTH_LOGOUT_PATH => Some((ApiRoute::AuthLogout, "POST")),
+        _ => None,
+    }
+}
+
+fn expected_method(path: &str) -> Option<&'static str> {
+    classify_auth_path(path)
+        .map(|(_, method)| method)
+        .or_else(|| (classify_read_path(path) != ApiRoute::NotFound).then_some("GET"))
 }
 
 fn classify_read_path(path: &str) -> ApiRoute {
@@ -250,6 +292,7 @@ pub fn valid_ray_id(candidate: &str) -> bool {
 /// Cloudflare's WebAssembly fetch entry point.
 #[event(fetch)]
 pub async fn fetch(request: Request, _env: Env, _context: Context) -> Result<Response> {
+    let mut request = request;
     let method = request.method().to_string();
     let path = request.path();
     let request_id = request_id(&request).unwrap_or_else(|error| {
@@ -263,7 +306,7 @@ pub async fn fetch(request: Request, _env: Env, _context: Context) -> Result<Res
         "request-id-unavailable".to_owned()
     });
 
-    match dispatch(&request, &method, &path, &request_id) {
+    match dispatch(&mut request, &_env, &method, &path, &request_id).await {
         Ok(response) => Ok(response),
         Err(error) => {
             console_error!(
@@ -287,7 +330,13 @@ pub async fn fetch(request: Request, _env: Env, _context: Context) -> Result<Res
     }
 }
 
-fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Result<Response> {
+async fn dispatch(
+    request: &mut Request,
+    env: &Env,
+    method: &str,
+    path: &str,
+    request_id: &str,
+) -> Result<Response> {
     let origin = request.headers().get("origin")?;
     let origin = origin.as_deref();
     let route = classify_route(method, path);
@@ -440,22 +489,76 @@ fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Re
                 )
             },
         ),
-        ApiRoute::Preflight => preflight_response(request, request_id, origin),
+        ApiRoute::AuthValidateInvite => {
+            auth_dispatch(
+                auth::AuthAction::ValidateInvite,
+                request,
+                env,
+                request_id,
+                origin,
+            )
+            .await
+        }
+        ApiRoute::AuthRegister => {
+            auth_dispatch(auth::AuthAction::Register, request, env, request_id, origin).await
+        }
+        ApiRoute::AuthLogin => {
+            auth_dispatch(auth::AuthAction::Login, request, env, request_id, origin).await
+        }
+        ApiRoute::AuthSession => {
+            auth_dispatch(auth::AuthAction::Session, request, env, request_id, origin).await
+        }
+        ApiRoute::AuthLogout => {
+            auth_dispatch(auth::AuthAction::Logout, request, env, request_id, origin).await
+        }
+        ApiRoute::Preflight => preflight_response(request, path, request_id, origin),
         ApiRoute::MethodNotAllowed => {
+            let allowed = expected_method(path).unwrap_or("GET");
             let mut response = error_response(
                 "method_not_allowed",
-                "This proof-of-concept endpoint is read-only; use GET.",
+                "Use the documented HTTP method for this endpoint.",
                 405,
                 request_id,
                 origin,
             )?;
-            response.headers_mut().set("Allow", "GET, OPTIONS")?;
+            response
+                .headers_mut()
+                .set("Allow", &format!("{allowed}, OPTIONS"))?;
             Ok(response)
         }
         ApiRoute::NotFound => error_response(
             "not_found",
             "No API route matches this request.",
             404,
+            request_id,
+            origin,
+        ),
+    }
+}
+
+async fn auth_dispatch(
+    action: auth::AuthAction,
+    request: &mut Request,
+    env: &Env,
+    request_id: &str,
+    origin: Option<&str>,
+) -> Result<Response> {
+    if action != auth::AuthAction::Session && allowed_origin(origin).is_none() {
+        return credentialed_error_response(
+            "origin_forbidden",
+            "This authentication request must come from an allowed browser origin.",
+            403,
+            request_id,
+            None,
+        );
+    }
+
+    match auth::handle(action, request, env).await? {
+        Ok(reply) => auth_success_response(reply, request_id, origin),
+        Err(problem) => credentialed_error_response(
+            problem.code,
+            problem.message,
+            problem.status,
             request_id,
             origin,
         ),
@@ -519,17 +622,17 @@ fn health_response(request_id: &str, origin: Option<&str>) -> Result<Response> {
 
 fn preflight_response(
     request: &Request,
+    path: &str,
     request_id: &str,
     origin: Option<&str>,
 ) -> Result<Response> {
     let requested_method = request.headers().get("access-control-request-method")?;
     let requested_headers = request.headers().get("access-control-request-headers")?;
 
-    if !cors_preflight_allowed(
-        origin,
-        requested_method.as_deref(),
-        requested_headers.as_deref(),
-    ) {
+    if allowed_origin(origin).is_none()
+        || requested_method.as_deref() != expected_method(path)
+        || !requested_headers_allowed(requested_headers.as_deref())
+    {
         return error_response(
             "cors_forbidden",
             "The CORS preflight request is not allowed.",
@@ -546,16 +649,61 @@ fn preflight_response(
         origin,
         CachePolicy::PrivateNoStore,
     )?;
-    response
-        .headers_mut()
-        .set("Access-Control-Allow-Methods", "GET, OPTIONS")?;
-    response
-        .headers_mut()
-        .set("Access-Control-Allow-Headers", "Content-Type, X-Request-ID")?;
+    response.headers_mut().set(
+        "Access-Control-Allow-Methods",
+        &format!("{}, OPTIONS", expected_method(path).unwrap_or("GET")),
+    )?;
+    response.headers_mut().set(
+        "Access-Control-Allow-Headers",
+        "Content-Type, X-CSRF-Token, X-Request-ID",
+    )?;
+    if classify_auth_path(path).is_some() {
+        response
+            .headers_mut()
+            .set("Access-Control-Allow-Credentials", "true")?;
+    }
     response
         .headers_mut()
         .set("Access-Control-Max-Age", "600")?;
     Ok(response)
+}
+
+fn auth_success_response(
+    reply: auth::AuthReply,
+    request_id: &str,
+    origin: Option<&str>,
+) -> Result<Response> {
+    let mut response = Response::from_json(&reply.body)?.with_status(reply.status);
+    apply_credentialed_headers(response.headers_mut(), request_id, origin)?;
+    for cookie in &reply.set_cookies {
+        response.headers_mut().append("Set-Cookie", cookie)?;
+    }
+    Ok(response)
+}
+
+fn credentialed_error_response(
+    code: &str,
+    message: &str,
+    status: u16,
+    request_id: &str,
+    origin: Option<&str>,
+) -> Result<Response> {
+    let mut response = error_response(code, message, status, request_id, origin)?;
+    apply_credentialed_headers(response.headers_mut(), request_id, origin)?;
+    Ok(response)
+}
+
+fn apply_credentialed_headers(
+    headers: &mut Headers,
+    request_id: &str,
+    origin: Option<&str>,
+) -> Result<()> {
+    apply_common_headers(headers, request_id, origin, CachePolicy::PrivateNoStore)?;
+    headers.set("Vary", "Origin, Cookie")?;
+    if allowed_origin(origin).is_some() {
+        headers.set("Access-Control-Allow-Credentials", "true")?;
+    }
+    Ok(())
 }
 
 fn public_response(
@@ -924,6 +1072,35 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn authentication_routes_accept_only_their_documented_methods() {
+        let posts = [
+            (AUTH_VALIDATE_INVITE_PATH, ApiRoute::AuthValidateInvite),
+            (AUTH_REGISTER_PATH, ApiRoute::AuthRegister),
+            (AUTH_LOGIN_PATH, ApiRoute::AuthLogin),
+            (AUTH_LOGOUT_PATH, ApiRoute::AuthLogout),
+        ];
+        for (path, route) in posts {
+            assert_eq!(classify_route("POST", path), route);
+            assert_eq!(classify_route("OPTIONS", path), ApiRoute::Preflight);
+            assert_eq!(classify_route("GET", path), ApiRoute::MethodNotAllowed);
+            assert_eq!(expected_method(path), Some("POST"));
+        }
+
+        assert_eq!(
+            classify_route("GET", AUTH_SESSION_PATH),
+            ApiRoute::AuthSession
+        );
+        assert_eq!(
+            classify_route("POST", AUTH_SESSION_PATH),
+            ApiRoute::MethodNotAllowed
+        );
+        assert_eq!(expected_method(AUTH_SESSION_PATH), Some("GET"));
+        assert!(requested_headers_allowed(Some(
+            "Content-Type, X-CSRF-Token, X-Request-ID"
+        )));
     }
 
     #[test]
