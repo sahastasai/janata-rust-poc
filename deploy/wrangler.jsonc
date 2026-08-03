@@ -1,0 +1,45 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  // An isolated POC Worker name; this must not reuse Janata infrastructure.
+  "name": "janata-cmrust-poc-worker",
+  "main": "../crates/worker-api/build/worker/shim.mjs",
+  "compatibility_date": "2026-08-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "routes": [
+    {
+      // This route is inert until an explicitly authorized deploy.
+      "pattern": "cmrust.sahasta.com",
+      "custom_domain": true,
+      "previews_enabled": false
+    }
+  ],
+  "build": {
+    "command": "../../deploy/build-worker.sh",
+    // Wrangler resolves build cwd from the process working directory.
+    "cwd": "crates/worker-api",
+    // Watch paths remain relative to this configuration file.
+    "watch_dir": "../crates/worker-api/src"
+  },
+  "assets": {
+    // Integration replaces this smoke shell with the Dioxus web release output.
+    "directory": "./web",
+    "not_found_handling": "single-page-application",
+    "html_handling": "none",
+    // Static files stay on Cloudflare's asset path; only API calls enter Wasm.
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.1
+    }
+  }
+}
