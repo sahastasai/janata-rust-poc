@@ -38,6 +38,7 @@ mkdir -p "$site_output/docs"
 rsync -a --delete "$repo_root/dist/docs/guide/" "$site_output/docs/guide/"
 rsync -a --delete "$repo_root/target/doc/" "$site_output/docs/api/"
 rsync -a --delete "$repo_root/benchmarks/evidence/" "$site_output/docs/evidence/"
+rsync -a --delete "$repo_root/docs/reports/" "$site_output/docs/reports/"
 cp "$repo_root/deploy/static/_headers" "$site_output/_headers"
 
 echo "Assembled POC site at $site_output"

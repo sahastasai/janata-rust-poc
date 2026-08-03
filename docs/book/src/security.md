@@ -29,4 +29,5 @@ server logs may include route, status, duration, and request ID, but never
 passwords, tokens, message bodies, or secret bindings.
 
 See `docs/decisions/0002-spacetime-messaging.md` for the current messaging
-threat boundary.
+threat boundary. The complete POC threat inventory and beta release gates are
+published in the [security review](/docs/reports/security.md).
