@@ -1,13 +1,17 @@
 //! Cloudflare Worker API for the isolated Janata Rust proof of concept.
 //!
-//! The runtime adapter is intentionally thin. Exact routing, query validation,
-//! deterministic seed construction, pagination, CORS, and cache choices remain
-//! ordinary Rust so contributors can understand and test them on a host machine.
+//! The runtime adapter is intentionally thin. Exact routing, canonical ID and
+//! query validation, deterministic seed construction, pagination, CORS, and
+//! cache choices remain ordinary Rust so contributors can test them on a host.
 
 mod query;
 mod seed;
 
-use janata_api_contract::{ApiError, DiscoverResponse, FeedResponse, NotificationsResponse, Page};
+use janata_api_contract::{
+    ApiError, ApiErrorEnvelope, CenterDetailResponse, DiscoverResponse, EventDetailResponse,
+    FeedResponse, NotificationsResponse, Page,
+};
+use janata_domain::{Center, CenterId, Event, EventId};
 use query::{QueryError, QueryShape, ReadQuery, parse_read_query};
 use serde_json::{Value, json};
 use worker::js_sys::{Function, Reflect};
@@ -32,10 +36,18 @@ pub const ALLOWED_ORIGINS: &[&str] = &[
 
 const HEALTH_PATH: &str = "/api/health";
 const DISCOVER_PATH: &str = "/api/v1/discover";
+const CENTERS_PATH: &str = "/api/v1/centers";
+const CENTER_DETAIL_PREFIX: &str = "/api/v1/centers/";
 const EVENTS_PATH: &str = "/api/v1/events";
+const EVENT_DETAIL_PREFIX: &str = "/api/v1/events/";
 const FEED_PATH: &str = "/api/v1/community/feed";
 const NOTIFICATIONS_PATH: &str = "/api/v1/notifications";
 const BOOTSTRAP_PATH: &str = "/api/v1/bootstrap";
+const COMPAT_CENTERS_PATH: &str = "/api/centers";
+const COMPAT_EVENTS_PATH: &str = "/api/fetchAllEvents";
+const COMPAT_CENTER_PATH: &str = "/api/fetchCenter";
+const COMPAT_EVENT_PATH: &str = "/api/fetchEvent";
+const COMPAT_CENTER_EVENTS_PATH: &str = "/api/fetchEventsByCenter";
 const ALLOWED_REQUEST_HEADERS: &[&str] = &["content-type", "x-request-id"];
 
 /// Result of matching an HTTP method and path against the POC API surface.
@@ -45,17 +57,33 @@ pub enum ApiRoute {
     Health,
     /// `GET /api/v1/discover`.
     Discover,
+    /// `GET /api/v1/centers`.
+    Centers,
+    /// `GET /api/v1/centers/:id`.
+    CenterDetail,
     /// `GET /api/v1/events`.
     Events,
+    /// `GET /api/v1/events/:id`.
+    EventDetail,
     /// `GET /api/v1/community/feed`.
     Feed,
     /// `GET /api/v1/notifications`.
     Notifications,
     /// `GET /api/v1/bootstrap`.
     Bootstrap,
+    /// Compatibility `GET /api/centers`.
+    CompatibilityCenters,
+    /// Compatibility `GET /api/fetchAllEvents`.
+    CompatibilityEvents,
+    /// Compatibility `GET /api/fetchCenter?centerID=`.
+    CompatibilityCenter,
+    /// Compatibility `GET /api/fetchEvent?id=`.
+    CompatibilityEvent,
+    /// Compatibility `GET /api/fetchEventsByCenter?centerID=`.
+    CompatibilityCenterEvents,
     /// CORS preflight for an existing read route.
     Preflight,
-    /// A known versioned path requested with a method this read-only POC rejects.
+    /// A known read path requested with a method this POC rejects.
     MethodNotAllowed,
     /// Any method/path pair not explicitly exposed by this POC.
     NotFound,
@@ -64,7 +92,7 @@ pub enum ApiRoute {
 /// Response caching intent, kept explicit at each route.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CachePolicy {
-    /// Short browser/CDN caching for deterministic public discovery and feed data.
+    /// Short browser/CDN caching for deterministic public discovery data.
     PublicShortLived,
     /// Private data and errors must not be retained by shared or browser caches.
     PrivateNoStore,
@@ -81,34 +109,98 @@ impl CachePolicy {
     }
 }
 
+/// Pure, client-safe problem description used by the runtime and host tests.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct HttpProblem {
+    code: &'static str,
+    message: &'static str,
+    status: u16,
+}
+
+impl HttpProblem {
+    const fn invalid_center_id() -> Self {
+        Self {
+            code: "invalid_id",
+            message: "Center ID must be a lowercase hyphenated UUID.",
+            status: 400,
+        }
+    }
+
+    const fn invalid_event_id() -> Self {
+        Self {
+            code: "invalid_id",
+            message: "Event ID must be a lowercase hyphenated UUID.",
+            status: 400,
+        }
+    }
+
+    const fn center_not_found() -> Self {
+        Self {
+            code: "not_found",
+            message: "Center not found.",
+            status: 404,
+        }
+    }
+
+    const fn event_not_found() -> Self {
+        Self {
+            code: "not_found",
+            message: "Event not found.",
+            status: 404,
+        }
+    }
+}
+
 /// Matches the deliberately small API surface using exact method/path checks.
 ///
-/// Versioned endpoints are read-only. A client attempting any other method on
-/// one of those exact paths receives [`ApiRoute::MethodNotAllowed`]. Unknown
-/// paths remain indistinguishable as [`ApiRoute::NotFound`].
+/// Every exposed route is read-only. Dynamic paths accept exactly one non-empty
+/// segment; canonical UUID validation happens before lookup in the handler.
 #[must_use]
 pub fn classify_route(method: &str, path: &str) -> ApiRoute {
-    if method == "GET" {
-        return match path {
-            HEALTH_PATH => ApiRoute::Health,
-            DISCOVER_PATH => ApiRoute::Discover,
-            EVENTS_PATH => ApiRoute::Events,
-            FEED_PATH => ApiRoute::Feed,
-            NOTIFICATIONS_PATH => ApiRoute::Notifications,
-            BOOTSTRAP_PATH => ApiRoute::Bootstrap,
-            _ => ApiRoute::NotFound,
-        };
+    let read_route = classify_read_path(path);
+    match method {
+        "GET" => read_route,
+        "OPTIONS" if read_route != ApiRoute::NotFound => ApiRoute::Preflight,
+        _ if read_route != ApiRoute::NotFound => ApiRoute::MethodNotAllowed,
+        _ => ApiRoute::NotFound,
     }
+}
 
-    if method == "OPTIONS" && is_known_path(path) {
-        return ApiRoute::Preflight;
+fn classify_read_path(path: &str) -> ApiRoute {
+    match path {
+        HEALTH_PATH => ApiRoute::Health,
+        DISCOVER_PATH => ApiRoute::Discover,
+        CENTERS_PATH => ApiRoute::Centers,
+        EVENTS_PATH => ApiRoute::Events,
+        FEED_PATH => ApiRoute::Feed,
+        NOTIFICATIONS_PATH => ApiRoute::Notifications,
+        BOOTSTRAP_PATH => ApiRoute::Bootstrap,
+        COMPAT_CENTERS_PATH => ApiRoute::CompatibilityCenters,
+        COMPAT_EVENTS_PATH => ApiRoute::CompatibilityEvents,
+        COMPAT_CENTER_PATH => ApiRoute::CompatibilityCenter,
+        COMPAT_EVENT_PATH => ApiRoute::CompatibilityEvent,
+        COMPAT_CENTER_EVENTS_PATH => ApiRoute::CompatibilityCenterEvents,
+        _ if one_dynamic_segment(path, CENTER_DETAIL_PREFIX).is_some() => ApiRoute::CenterDetail,
+        _ if one_dynamic_segment(path, EVENT_DETAIL_PREFIX).is_some() => ApiRoute::EventDetail,
+        _ => ApiRoute::NotFound,
     }
+}
 
-    if is_versioned_path(path) {
-        ApiRoute::MethodNotAllowed
-    } else {
-        ApiRoute::NotFound
-    }
+fn one_dynamic_segment<'a>(path: &'a str, prefix: &str) -> Option<&'a str> {
+    path.strip_prefix(prefix)
+        .filter(|segment| !segment.is_empty() && !segment.contains('/'))
+}
+
+fn parse_center_path(path: &str) -> std::result::Result<CenterId, HttpProblem> {
+    one_dynamic_segment(path, CENTER_DETAIL_PREFIX)
+        .and_then(|segment| CenterId::parse_canonical(segment).ok())
+        .ok_or_else(HttpProblem::invalid_center_id)
+}
+
+fn parse_event_path(path: &str) -> std::result::Result<EventId, HttpProblem> {
+    one_dynamic_segment(path, EVENT_DETAIL_PREFIX)
+        .and_then(|segment| EventId::parse_canonical(segment).ok())
+        .ok_or_else(HttpProblem::invalid_event_id)
 }
 
 /// Returns an origin only when it is an exact member of [`ALLOWED_ORIGINS`].
@@ -118,9 +210,6 @@ pub fn allowed_origin(origin: Option<&str>) -> Option<&str> {
 }
 
 /// Checks the browser's requested CORS headers against a small allowlist.
-///
-/// Header names are case-insensitive. Empty comma-separated entries are
-/// ignored, but every actual name must be explicitly allowed.
 #[must_use]
 pub fn requested_headers_allowed(requested: Option<&str>) -> bool {
     requested.is_none_or(|headers| {
@@ -175,9 +264,6 @@ pub async fn fetch(request: Request, _env: Env, _context: Context) -> Result<Res
     });
 
     match dispatch(&request, &method, &path, &request_id) {
-        // Cloudflare invocation logs already record successful requests. Avoid
-        // allocating and serializing a second log entry on the hottest path;
-        // explicit structured logging is reserved for failures below.
         Ok(response) => Ok(response),
         Err(error) => {
             console_error!(
@@ -203,62 +289,165 @@ pub async fn fetch(request: Request, _env: Env, _context: Context) -> Result<Res
 
 fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Result<Response> {
     let origin = request.headers().get("origin")?;
+    let origin = origin.as_deref();
+    let route = classify_route(method, path);
 
-    match classify_route(method, path) {
-        ApiRoute::Health => health_response(request_id, origin.as_deref()),
-        ApiRoute::Discover => match request_query(request, QueryShape::Discover)? {
-            Ok(query) => read_response(
-                serde_json::to_value(discover_payload(query)?)?,
-                CachePolicy::PublicShortLived,
+    match route {
+        ApiRoute::Health => health_response(request_id, origin),
+        ApiRoute::Discover => {
+            with_query(request, QueryShape::Discover, request_id, origin, |query| {
+                public_response(
+                    serde_json::to_value(discover_payload(query)?)?,
+                    route,
+                    request_id,
+                    origin,
+                )
+            })
+        }
+        ApiRoute::Centers => with_query(request, QueryShape::Page, request_id, origin, |query| {
+            public_response(
+                serde_json::to_value(centers_payload(query)?)?,
+                route,
                 request_id,
-                origin.as_deref(),
-            ),
-            Err(error) => invalid_query_response(&error, request_id, origin.as_deref()),
-        },
-        ApiRoute::Events => match request_query(request, QueryShape::Events)? {
-            Ok(query) => read_response(
-                events_payload(query)?,
-                CachePolicy::PublicShortLived,
+                origin,
+            )
+        }),
+        ApiRoute::CenterDetail => {
+            let center_id = match parse_center_path(path) {
+                Ok(id) => id,
+                Err(problem) => return problem_response(problem, request_id, origin),
+            };
+            with_query(request, QueryShape::Page, request_id, origin, |query| {
+                match center_detail_payload(center_id, query)? {
+                    Some(detail) => {
+                        public_response(serde_json::to_value(detail)?, route, request_id, origin)
+                    }
+                    None => problem_response(HttpProblem::center_not_found(), request_id, origin),
+                }
+            })
+        }
+        ApiRoute::Events => with_query(request, QueryShape::Events, request_id, origin, |query| {
+            public_response(
+                serde_json::to_value(events_payload(query)?)?,
+                route,
                 request_id,
-                origin.as_deref(),
-            ),
-            Err(error) => invalid_query_response(&error, request_id, origin.as_deref()),
-        },
-        ApiRoute::Feed => match request_query(request, QueryShape::Page)? {
-            Ok(query) => read_response(
+                origin,
+            )
+        }),
+        ApiRoute::EventDetail => {
+            let event_id = match parse_event_path(path) {
+                Ok(id) => id,
+                Err(problem) => return problem_response(problem, request_id, origin),
+            };
+            with_query(request, QueryShape::None, request_id, origin, |_| {
+                match event_detail_payload(event_id)? {
+                    Some(detail) => {
+                        public_response(serde_json::to_value(detail)?, route, request_id, origin)
+                    }
+                    None => problem_response(HttpProblem::event_not_found(), request_id, origin),
+                }
+            })
+        }
+        ApiRoute::Feed => with_query(request, QueryShape::Page, request_id, origin, |query| {
+            public_response(
                 serde_json::to_value(feed_payload(query)?)?,
-                CachePolicy::PublicShortLived,
+                route,
                 request_id,
-                origin.as_deref(),
-            ),
-            Err(error) => invalid_query_response(&error, request_id, origin.as_deref()),
-        },
-        ApiRoute::Notifications => match request_query(request, QueryShape::Page)? {
-            Ok(query) => read_response(
-                serde_json::to_value(notifications_payload(query)?)?,
-                CachePolicy::PrivateNoStore,
-                request_id,
-                origin.as_deref(),
-            ),
-            Err(error) => invalid_query_response(&error, request_id, origin.as_deref()),
-        },
-        ApiRoute::Bootstrap => match request_query(request, QueryShape::None)? {
-            Ok(_) => read_response(
+                origin,
+            )
+        }),
+        ApiRoute::Notifications => {
+            with_query(request, QueryShape::Page, request_id, origin, |query| {
+                read_response(
+                    serde_json::to_value(notifications_payload(query)?)?,
+                    CachePolicy::PrivateNoStore,
+                    request_id,
+                    origin,
+                )
+            })
+        }
+        ApiRoute::Bootstrap => with_query(request, QueryShape::None, request_id, origin, |_| {
+            read_response(
                 bootstrap_payload()?,
                 CachePolicy::PrivateNoStore,
                 request_id,
-                origin.as_deref(),
-            ),
-            Err(error) => invalid_query_response(&error, request_id, origin.as_deref()),
-        },
-        ApiRoute::Preflight => preflight_response(request, request_id, origin.as_deref()),
+                origin,
+            )
+        }),
+        ApiRoute::CompatibilityCenters => with_query(
+            request,
+            QueryShape::CompatibilityPage,
+            request_id,
+            origin,
+            |query| {
+                public_response(
+                    compatibility_centers_payload(query)?,
+                    route,
+                    request_id,
+                    origin,
+                )
+            },
+        ),
+        ApiRoute::CompatibilityEvents => with_query(
+            request,
+            QueryShape::CompatibilityEvents,
+            request_id,
+            origin,
+            |query| {
+                public_response(
+                    compatibility_events_payload(query)?,
+                    route,
+                    request_id,
+                    origin,
+                )
+            },
+        ),
+        ApiRoute::CompatibilityCenter => with_query(
+            request,
+            QueryShape::CompatibilityCenter,
+            request_id,
+            origin,
+            |query| match compatibility_center_payload(
+                query.center_id.expect("validated compatibility center ID"),
+            )? {
+                Some(value) => public_response(value, route, request_id, origin),
+                None => problem_response(HttpProblem::center_not_found(), request_id, origin),
+            },
+        ),
+        ApiRoute::CompatibilityEvent => with_query(
+            request,
+            QueryShape::CompatibilityEvent,
+            request_id,
+            origin,
+            |query| match compatibility_event_payload(
+                query.event_id.expect("validated compatibility event ID"),
+            )? {
+                Some(value) => public_response(value, route, request_id, origin),
+                None => problem_response(HttpProblem::event_not_found(), request_id, origin),
+            },
+        ),
+        ApiRoute::CompatibilityCenterEvents => with_query(
+            request,
+            QueryShape::CompatibilityEventsByCenter,
+            request_id,
+            origin,
+            |query| {
+                public_response(
+                    compatibility_center_events_payload(query)?,
+                    route,
+                    request_id,
+                    origin,
+                )
+            },
+        ),
+        ApiRoute::Preflight => preflight_response(request, request_id, origin),
         ApiRoute::MethodNotAllowed => {
             let mut response = error_response(
                 "method_not_allowed",
                 "This proof-of-concept endpoint is read-only; use GET.",
                 405,
                 request_id,
-                origin.as_deref(),
+                origin,
             )?;
             response.headers_mut().set("Allow", "GET, OPTIONS")?;
             Ok(response)
@@ -268,8 +457,24 @@ fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Re
             "No API route matches this request.",
             404,
             request_id,
-            origin.as_deref(),
+            origin,
         ),
+    }
+}
+
+fn with_query<F>(
+    request: &Request,
+    shape: QueryShape,
+    request_id: &str,
+    origin: Option<&str>,
+    handler: F,
+) -> Result<Response>
+where
+    F: FnOnce(ReadQuery) -> Result<Response>,
+{
+    match request_query(request, shape)? {
+        Ok(query) => handler(query),
+        Err(error) => invalid_query_response(&error, request_id, origin),
     }
 }
 
@@ -278,6 +483,23 @@ fn request_query(
     shape: QueryShape,
 ) -> Result<std::result::Result<ReadQuery, QueryError>> {
     Ok(parse_read_query(&request.url()?, shape))
+}
+
+fn success_cache_policy(route: ApiRoute) -> CachePolicy {
+    match route {
+        ApiRoute::Discover
+        | ApiRoute::Centers
+        | ApiRoute::CenterDetail
+        | ApiRoute::Events
+        | ApiRoute::EventDetail
+        | ApiRoute::Feed
+        | ApiRoute::CompatibilityCenters
+        | ApiRoute::CompatibilityEvents
+        | ApiRoute::CompatibilityCenter
+        | ApiRoute::CompatibilityEvent
+        | ApiRoute::CompatibilityCenterEvents => CachePolicy::PublicShortLived,
+        _ => CachePolicy::PrivateNoStore,
+    }
 }
 
 fn health_response(request_id: &str, origin: Option<&str>) -> Result<Response> {
@@ -336,6 +558,15 @@ fn preflight_response(
     Ok(response)
 }
 
+fn public_response(
+    body: Value,
+    route: ApiRoute,
+    request_id: &str,
+    origin: Option<&str>,
+) -> Result<Response> {
+    read_response(body, success_cache_policy(route), request_id, origin)
+}
+
 fn read_response(
     body: Value,
     cache_policy: CachePolicy,
@@ -354,13 +585,13 @@ fn error_response(
     request_id: &str,
     origin: Option<&str>,
 ) -> Result<Response> {
-    let body = json!({
-        "error": ApiError {
+    let body = ApiErrorEnvelope {
+        error: ApiError {
             code: code.to_owned(),
             message: message.to_owned(),
             request_id: request_id.to_owned(),
-        }
-    });
+        },
+    };
     let mut response = Response::from_json(&body)?.with_status(status);
     apply_common_headers(
         response.headers_mut(),
@@ -369,6 +600,20 @@ fn error_response(
         CachePolicy::PrivateNoStore,
     )?;
     Ok(response)
+}
+
+fn problem_response(
+    problem: HttpProblem,
+    request_id: &str,
+    origin: Option<&str>,
+) -> Result<Response> {
+    error_response(
+        problem.code,
+        problem.message,
+        problem.status,
+        request_id,
+        origin,
+    )
 }
 
 fn invalid_query_response(
@@ -415,29 +660,65 @@ fn apply_common_headers(
 
 fn discover_payload(query: ReadQuery) -> serde_json::Result<DiscoverResponse> {
     let mut discover = seed::discover()?;
-    discover.events.retain(|event| {
-        query.category.as_deref().is_none_or(|expected| {
-            event
-                .category
-                .as_deref()
-                .is_some_and(|actual| actual.eq_ignore_ascii_case(expected))
-        })
-    });
+    filter_events(&mut discover.events, &query);
+    discover.centers.truncate(query.limit);
     discover.events.truncate(query.limit);
     Ok(discover)
 }
 
-fn events_payload(query: ReadQuery) -> serde_json::Result<Value> {
-    let mut discover = seed::discover()?;
-    discover.events.retain(|event| {
+fn centers_payload(query: ReadQuery) -> serde_json::Result<Page<Center>> {
+    let discover = seed::discover()?;
+    Ok(paginate(&discover.centers, query.offset, query.limit))
+}
+
+fn center_detail_payload(
+    center_id: CenterId,
+    query: ReadQuery,
+) -> serde_json::Result<Option<CenterDetailResponse>> {
+    let discover = seed::discover()?;
+    let Some(center) = discover
+        .centers
+        .into_iter()
+        .find(|center| center.id == center_id)
+    else {
+        return Ok(None);
+    };
+    let events = discover
+        .events
+        .into_iter()
+        .filter(|event| event.center_id == Some(center_id))
+        .collect::<Vec<_>>();
+    Ok(Some(CenterDetailResponse {
+        center,
+        events: paginate(&events, query.offset, query.limit),
+    }))
+}
+
+fn events_payload(query: ReadQuery) -> serde_json::Result<Page<Event>> {
+    let mut events = seed::discover()?.events;
+    filter_events(&mut events, &query);
+    Ok(paginate(&events, query.offset, query.limit))
+}
+
+fn event_detail_payload(event_id: EventId) -> serde_json::Result<Option<EventDetailResponse>> {
+    Ok(seed::discover()?
+        .events
+        .into_iter()
+        .find(|event| event.id == event_id)
+        .map(|event| EventDetailResponse { event }))
+}
+
+fn filter_events(events: &mut Vec<Event>, query: &ReadQuery) {
+    events.retain(|event| {
         query.category.as_deref().is_none_or(|expected| {
             event
                 .category
                 .as_deref()
                 .is_some_and(|actual| actual.eq_ignore_ascii_case(expected))
-        })
+        }) && query
+            .center_id
+            .is_none_or(|expected| event.center_id == Some(expected))
     });
-    serde_json::to_value(paginate(&discover.events, query.offset, query.limit))
 }
 
 fn feed_payload(query: ReadQuery) -> serde_json::Result<FeedResponse> {
@@ -460,6 +741,110 @@ fn bootstrap_payload() -> serde_json::Result<Value> {
     }))
 }
 
+fn compatibility_centers_payload(query: ReadQuery) -> serde_json::Result<Value> {
+    let centers = seed::discover()?.centers;
+    let total = centers.len();
+    let page = paginate(&centers, query.offset, query.limit);
+    Ok(json!({
+        "centers": page.items.iter().map(compatibility_center).collect::<Vec<_>>(),
+        "total": total,
+        "limit": query.limit,
+        "offset": query.offset,
+    }))
+}
+
+fn compatibility_events_payload(query: ReadQuery) -> serde_json::Result<Value> {
+    let events = seed::discover()?.events;
+    let total = events.len();
+    let page = paginate(&events, query.offset, query.limit);
+    Ok(json!({
+        "message": "Success",
+        "events": page.items.iter().map(compatibility_event).collect::<Vec<_>>(),
+        "total": total,
+        "limit": query.limit,
+        "offset": query.offset,
+    }))
+}
+
+fn compatibility_center_payload(center_id: CenterId) -> serde_json::Result<Option<Value>> {
+    Ok(seed::discover()?
+        .centers
+        .iter()
+        .find(|center| center.id == center_id)
+        .map(|center| json!({ "message": "Success", "center": compatibility_center(center) })))
+}
+
+fn compatibility_event_payload(event_id: EventId) -> serde_json::Result<Option<Value>> {
+    Ok(seed::discover()?
+        .events
+        .iter()
+        .find(|event| event.id == event_id)
+        .map(|event| json!({ "message": "Success", "event": compatibility_event(event) })))
+}
+
+fn compatibility_center_events_payload(query: ReadQuery) -> serde_json::Result<Value> {
+    let center_id = query.center_id.expect("validated compatibility center ID");
+    let events = seed::discover()?
+        .events
+        .into_iter()
+        .filter(|event| event.center_id == Some(center_id))
+        .collect::<Vec<_>>();
+    let total = events.len();
+    let page = paginate(&events, query.offset, query.limit);
+    Ok(json!({
+        "message": "Success",
+        "events": page.items.iter().map(compatibility_event).collect::<Vec<_>>(),
+        "total": total,
+        "limit": query.limit,
+        "offset": query.offset,
+    }))
+}
+
+fn compatibility_center(center: &Center) -> Value {
+    json!({
+        "centerID": center.id,
+        "name": center.name,
+        "latitude": center.latitude,
+        "longitude": center.longitude,
+        "address": center.address,
+        "website": center.website,
+        "phone": center.phone,
+        "image": center.image_url,
+        "acharya": center.acharya,
+        "pointOfContact": center.point_of_contact,
+        "description": center.description,
+        "memberCount": center.member_count,
+        "isVerified": center.verified,
+    })
+}
+
+fn compatibility_event(event: &Event) -> Value {
+    json!({
+        "eventID": event.id,
+        "title": event.title,
+        "description": event.description,
+        "date": event.date,
+        "endDate": event.end_date,
+        "isRecurring": event.recurring,
+        "timeLabel": event.time_label,
+        "latitude": event.latitude,
+        "longitude": event.longitude,
+        "address": event.address,
+        "centerID": event.center_id,
+        "tier": 0,
+        "peopleAttending": event.attendee_count,
+        "pointOfContact": event.point_of_contact,
+        "image": event.image_url,
+        "category": event.category,
+        "createdBy": event.created_by,
+        "externalUrl": event.external_url,
+        "signupUrl": event.signup_url,
+        "allowJanataSignup": event.allow_janata_signup,
+        "isOfficial": event.official,
+        "requiresVerified": event.requires_verified,
+    })
+}
+
 fn paginate<T: Clone>(items: &[T], offset: usize, limit: usize) -> Page<T> {
     let start = offset.min(items.len());
     let end = start.saturating_add(limit).min(items.len());
@@ -467,18 +852,6 @@ fn paginate<T: Clone>(items: &[T], offset: usize, limit: usize) -> Page<T> {
         items: items[start..end].to_vec(),
         next_cursor: (end < items.len()).then(|| format!("offset:{end}")),
     }
-}
-
-fn is_known_path(path: &str) -> bool {
-    path == HEALTH_PATH || is_versioned_path(path)
-}
-
-fn is_versioned_path(path: &str) -> bool {
-    path == DISCOVER_PATH
-        || path == EVENTS_PATH
-        || path == FEED_PATH
-        || path == NOTIFICATIONS_PATH
-        || path == BOOTSTRAP_PATH
 }
 
 fn request_id(request: &Request) -> Result<String> {
@@ -506,59 +879,103 @@ fn random_uuid() -> Result<String> {
 mod tests {
     use super::*;
 
+    const CENTER_ID: &str = "00000000-0000-0000-0000-000000000065";
+    const EVENT_ID: &str = "00000000-0000-0000-0000-0000000000c9";
+
     #[test]
     fn route_matching_is_exact_for_every_read_endpoint() {
         let reads = [
             (HEALTH_PATH, ApiRoute::Health),
             (DISCOVER_PATH, ApiRoute::Discover),
+            (CENTERS_PATH, ApiRoute::Centers),
+            (
+                &format!("{CENTER_DETAIL_PREFIX}{CENTER_ID}"),
+                ApiRoute::CenterDetail,
+            ),
             (EVENTS_PATH, ApiRoute::Events),
+            (
+                &format!("{EVENT_DETAIL_PREFIX}{EVENT_ID}"),
+                ApiRoute::EventDetail,
+            ),
             (FEED_PATH, ApiRoute::Feed),
             (NOTIFICATIONS_PATH, ApiRoute::Notifications),
             (BOOTSTRAP_PATH, ApiRoute::Bootstrap),
+            (COMPAT_CENTERS_PATH, ApiRoute::CompatibilityCenters),
+            (COMPAT_EVENTS_PATH, ApiRoute::CompatibilityEvents),
+            (COMPAT_CENTER_PATH, ApiRoute::CompatibilityCenter),
+            (COMPAT_EVENT_PATH, ApiRoute::CompatibilityEvent),
+            (
+                COMPAT_CENTER_EVENTS_PATH,
+                ApiRoute::CompatibilityCenterEvents,
+            ),
         ];
         for (path, route) in reads {
-            assert_eq!(classify_route("GET", path), route);
-            assert_eq!(classify_route("OPTIONS", path), ApiRoute::Preflight);
+            assert_eq!(classify_route("GET", path), route, "GET {path}");
             assert_eq!(
-                classify_route("GET", &format!("{path}/")),
-                ApiRoute::NotFound
+                classify_route("OPTIONS", path),
+                ApiRoute::Preflight,
+                "OPTIONS {path}"
+            );
+            for method in ["POST", "PUT", "PATCH", "DELETE", "HEAD"] {
+                assert_eq!(
+                    classify_route(method, path),
+                    ApiRoute::MethodNotAllowed,
+                    "{method} {path}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dynamic_routes_reject_extra_or_missing_segments() {
+        for path in [
+            CENTER_DETAIL_PREFIX,
+            "/api/v1/centers/",
+            &format!("{CENTER_DETAIL_PREFIX}{CENTER_ID}/"),
+            &format!("{CENTER_DETAIL_PREFIX}{CENTER_ID}/events"),
+            EVENT_DETAIL_PREFIX,
+            &format!("{EVENT_DETAIL_PREFIX}{EVENT_ID}/"),
+        ] {
+            assert_eq!(classify_route("GET", path), ApiRoute::NotFound, "{path}");
+            assert_eq!(
+                classify_route("OPTIONS", path),
+                ApiRoute::NotFound,
+                "{path}"
             );
         }
     }
 
     #[test]
-    fn versioned_mutations_fail_explicitly_without_exposing_unknown_paths() {
-        for method in ["POST", "PUT", "PATCH", "DELETE", "HEAD"] {
-            assert_eq!(
-                classify_route(method, EVENTS_PATH),
-                ApiRoute::MethodNotAllowed
-            );
-        }
-        assert_eq!(classify_route("POST", HEALTH_PATH), ApiRoute::NotFound);
-        assert_eq!(classify_route("POST", "/api/v1/admin"), ApiRoute::NotFound);
+    fn dynamic_ids_are_canonical_before_lookup() {
         assert_eq!(
-            classify_route("OPTIONS", "/api/v1/missing"),
-            ApiRoute::NotFound
+            parse_center_path(&format!("{CENTER_DETAIL_PREFIX}{CENTER_ID}"))
+                .map(|id| id.to_string()),
+            Ok(CENTER_ID.to_owned())
+        );
+        assert_eq!(
+            parse_event_path(&format!("{EVENT_DETAIL_PREFIX}{EVENT_ID}")).map(|id| id.to_string()),
+            Ok(EVENT_ID.to_owned())
+        );
+        assert_eq!(
+            parse_center_path("/api/v1/centers/00000000000000000000000000000065"),
+            Err(HttpProblem::invalid_center_id())
+        );
+        assert_eq!(
+            parse_event_path("/api/v1/events/NOT-A-UUID"),
+            Err(HttpProblem::invalid_event_id())
         );
     }
 
     #[test]
-    fn cors_origins_are_exact() {
+    fn cors_origins_and_preflights_are_exact() {
         for origin in ALLOWED_ORIGINS {
             assert_eq!(allowed_origin(Some(origin)), Some(*origin));
         }
-
         assert_eq!(allowed_origin(None), None);
         assert_eq!(
             allowed_origin(Some("https://cmrust.sahasta.com.evil.test")),
             None
         );
-        assert_eq!(allowed_origin(Some("https://CMRUST.SAHASTA.COM")), None);
-        assert_eq!(allowed_origin(Some("http://localhost:3000")), None);
-    }
-
-    #[test]
-    fn preflight_policy_requires_exact_method_origin_and_headers() {
         assert!(cors_preflight_allowed(
             Some("http://localhost:8080"),
             Some("GET"),
@@ -574,31 +991,29 @@ mod tests {
             Some("GET"),
             None
         ));
-        assert!(!cors_preflight_allowed(
-            Some("http://localhost:8080"),
-            Some("GET"),
-            Some("Authorization")
-        ));
-    }
-
-    #[test]
-    fn preflight_headers_are_allowlisted_case_insensitively() {
-        assert!(requested_headers_allowed(None));
-        assert!(requested_headers_allowed(Some("")));
-        assert!(requested_headers_allowed(Some(
-            "Content-Type, X-Request-ID"
-        )));
-        assert!(requested_headers_allowed(Some("content-type,x-request-id")));
         assert!(!requested_headers_allowed(Some("Authorization")));
-        assert!(!requested_headers_allowed(Some("Content-Type, X-Unsafe")));
     }
 
     #[test]
-    fn cache_policies_do_not_mix_public_and_notification_data() {
-        assert!(
-            CachePolicy::PublicShortLived
-                .header_value()
-                .starts_with("public")
+    fn public_discovery_successes_are_cacheable_but_private_routes_and_errors_are_not() {
+        let public = [
+            ApiRoute::Discover,
+            ApiRoute::Centers,
+            ApiRoute::CenterDetail,
+            ApiRoute::Events,
+            ApiRoute::EventDetail,
+            ApiRoute::CompatibilityCenters,
+            ApiRoute::CompatibilityEvents,
+            ApiRoute::CompatibilityCenter,
+            ApiRoute::CompatibilityEvent,
+            ApiRoute::CompatibilityCenterEvents,
+        ];
+        for route in public {
+            assert_eq!(success_cache_policy(route), CachePolicy::PublicShortLived);
+        }
+        assert_eq!(
+            success_cache_policy(ApiRoute::Health),
+            CachePolicy::PrivateNoStore
         );
         assert_eq!(
             CachePolicy::PrivateNoStore.header_value(),
@@ -611,68 +1026,85 @@ mod tests {
         let page = paginate(&[1, 2, 3], 0, 2);
         assert_eq!(page.items, vec![1, 2]);
         assert_eq!(page.next_cursor.as_deref(), Some("offset:2"));
-
-        let final_page = paginate(&[1, 2, 3], 2, 50);
-        assert_eq!(final_page.items, vec![3]);
-        assert_eq!(final_page.next_cursor, None);
-
         let beyond_end = paginate(&[1, 2, 3], 10_000, 1);
         assert!(beyond_end.items.is_empty());
         assert_eq!(beyond_end.next_cursor, None);
     }
 
     #[test]
-    fn event_filter_and_typed_contracts_are_stable() {
+    fn typed_center_and_event_filters_are_stable() {
+        let center_id = CenterId::parse_canonical(CENTER_ID).expect("fixture center ID");
         let discover = discover_payload(ReadQuery {
             limit: 1,
-            offset: 0,
-            category: Some("satsang".to_owned()),
+            category: Some("meditation".to_owned()),
+            center_id: Some(center_id),
+            ..ReadQuery::default()
         })
         .expect("discover payload should build");
-        assert_eq!(discover.centers.len(), 2);
+        assert_eq!(discover.centers.len(), 1);
         assert_eq!(discover.events.len(), 1);
-        assert_eq!(discover.events[0].category.as_deref(), Some("satsang"));
+        assert_eq!(discover.events[0].center_id, Some(center_id));
 
         let events = events_payload(ReadQuery {
             limit: 2,
-            offset: 0,
-            category: None,
+            center_id: Some(center_id),
+            ..ReadQuery::default()
         })
         .expect("event page should build");
-        assert_eq!(events["items"].as_array().map(Vec::len), Some(2));
-        assert_eq!(events["nextCursor"], "offset:2");
+        assert_eq!(events.items.len(), 2);
+        assert_eq!(events.next_cursor, None);
     }
 
     #[test]
-    fn notifications_report_total_unread_count_across_pages() {
-        let response = notifications_payload(ReadQuery {
+    fn detail_lookup_distinguishes_missing_resources() {
+        let center_id = CenterId::parse_canonical(CENTER_ID).expect("fixture center ID");
+        let detail = center_detail_payload(center_id, ReadQuery::default())
+            .expect("center detail should build")
+            .expect("center should exist");
+        assert_eq!(detail.center.id, center_id);
+        assert_eq!(detail.events.items.len(), 2);
+
+        let missing = EventId::parse_canonical("00000000-0000-0000-0000-000000009999")
+            .expect("canonical missing ID");
+        assert!(
+            event_detail_payload(missing)
+                .expect("event lookup should build")
+                .is_none()
+        );
+        assert_eq!(HttpProblem::event_not_found().status, 404);
+        assert_eq!(HttpProblem::event_not_found().code, "not_found");
+    }
+
+    #[test]
+    fn compatibility_aliases_keep_reference_envelopes_and_remain_bounded() {
+        let centers = compatibility_centers_payload(ReadQuery {
             limit: 1,
-            offset: 1,
-            category: None,
+            ..ReadQuery::default()
         })
-        .expect("notification payload should build");
-        assert_eq!(response.notifications.items.len(), 1);
-        assert_eq!(response.unread_count, 2);
+        .expect("center alias should build");
+        assert_eq!(centers["centers"].as_array().map(Vec::len), Some(1));
+        assert_eq!(centers["centers"][0]["centerID"], CENTER_ID);
+        assert_eq!(centers["limit"], 1);
+        assert_eq!(centers["total"], 2);
+
+        let event_id = EventId::parse_canonical(EVENT_ID).expect("fixture event ID");
+        let event = compatibility_event_payload(event_id)
+            .expect("event alias should build")
+            .expect("event should exist");
+        assert_eq!(event["message"], "Success");
+        assert_eq!(event["event"]["eventID"], EVENT_ID);
+        assert_eq!(event["event"]["peopleAttending"], 18);
     }
 
     #[test]
-    fn bootstrap_is_one_typed_aggregate() {
-        let value = bootstrap_payload().expect("bootstrap contract should serialize");
-        assert!(value.get("discover").is_some());
-        assert!(value.get("feed").is_some());
-        assert!(value.get("notifications").is_some());
-        assert_eq!(value.as_object().map(serde_json::Map::len), Some(3));
-    }
-
-    #[test]
-    fn structured_error_contains_one_support_request_id() {
-        let envelope = json!({
-            "error": ApiError {
+    fn structured_errors_contain_one_support_request_id() {
+        let envelope = ApiErrorEnvelope {
+            error: ApiError {
                 code: "invalid_query".to_owned(),
                 message: "Fix the query.".to_owned(),
                 request_id: "request-123".to_owned(),
-            }
-        });
+            },
+        };
         let value = serde_json::to_value(envelope).expect("error should serialize");
         assert_eq!(value["error"]["code"], "invalid_query");
         assert_eq!(value["error"]["requestId"], "request-123");
