@@ -47,9 +47,9 @@ regression gate for those exact expectations; deployed smoke checks are still
 required because proxies and Worker configuration can change headers.
 
 The custom domain has Cloudflare Web Analytics automatic injection enabled.
-The static-page CSP allowlists only Cloudflare's exact beacon script path; the
-automatically injected tag carries Cloudflare-managed Subresource Integrity and
-posts metrics back to the same origin. This exception does not apply to API
+The static-page CSP allowlists only Cloudflare's versioned beacon path prefix;
+the automatically injected tag carries Cloudflare-managed Subresource Integrity
+and posts metrics back to the same origin. This exception does not apply to API
 responses. Privacy review and confirmation of the zone analytics setting remain
 release gates.
 
