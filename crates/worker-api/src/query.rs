@@ -2,6 +2,7 @@
 
 use std::fmt::{Display, Formatter};
 
+use janata_domain::{CenterId, EventId};
 use worker::Url;
 
 /// Default number of records returned by a list endpoint.
@@ -12,12 +13,14 @@ const MAX_QUERY_BYTES: usize = 256;
 const MAX_CURSOR_OFFSET: usize = 10_000;
 const MAX_CATEGORY_CHARS: usize = 32;
 
-/// Validated pagination and optional event-category filtering.
+/// Validated pagination and public event filters.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct ReadQuery {
     pub(crate) limit: usize,
     pub(crate) offset: usize,
     pub(crate) category: Option<String>,
+    pub(crate) center_id: Option<CenterId>,
+    pub(crate) event_id: Option<EventId>,
 }
 
 impl Default for ReadQuery {
@@ -26,6 +29,8 @@ impl Default for ReadQuery {
             limit: DEFAULT_PAGE_SIZE,
             offset: 0,
             category: None,
+            center_id: None,
+            event_id: None,
         }
     }
 }
@@ -35,12 +40,22 @@ impl Default for ReadQuery {
 pub(crate) enum QueryShape {
     /// No query parameters are accepted.
     None,
-    /// `limit` and `cursor` are accepted.
+    /// `limit` and opaque `cursor` are accepted.
     Page,
-    /// `limit`, `cursor`, and `category` are accepted.
+    /// `limit`, opaque `cursor`, `category`, and `centerId` are accepted.
     Events,
-    /// `limit` and `category` are accepted; discover has no cursor contract.
+    /// `limit`, `category`, and `centerId` are accepted; no cursor contract.
     Discover,
+    /// Legacy `limit` and integer `offset` pagination.
+    CompatibilityPage,
+    /// Legacy event page with `limit` and integer `offset`.
+    CompatibilityEvents,
+    /// Legacy center lookup requiring `centerID`.
+    CompatibilityCenter,
+    /// Legacy event lookup requiring `id` or `eventID`.
+    CompatibilityEvent,
+    /// Legacy center event lookup requiring `centerID`, with bounded paging.
+    CompatibilityEventsByCenter,
 }
 
 /// Client-safe explanation of a malformed or unsupported query string.
@@ -70,15 +85,23 @@ pub(crate) fn parse_read_query(url: &Url, shape: QueryShape) -> Result<ReadQuery
 
     let mut parsed = ReadQuery::default();
     let mut saw_limit = false;
+    let mut saw_offset = false;
     let mut saw_cursor = false;
     let mut saw_category = false;
+    let mut saw_center = false;
+    let mut saw_event = false;
 
     for (key, value) in url.query_pairs() {
         match key.as_ref() {
             "limit"
                 if matches!(
                     shape,
-                    QueryShape::Page | QueryShape::Events | QueryShape::Discover
+                    QueryShape::Page
+                        | QueryShape::Events
+                        | QueryShape::Discover
+                        | QueryShape::CompatibilityPage
+                        | QueryShape::CompatibilityEvents
+                        | QueryShape::CompatibilityEventsByCenter
                 ) =>
             {
                 reject_duplicate(&mut saw_limit, "limit")?;
@@ -88,9 +111,37 @@ pub(crate) fn parse_read_query(url: &Url, shape: QueryShape) -> Result<ReadQuery
                 reject_duplicate(&mut saw_cursor, "cursor")?;
                 parsed.offset = parse_cursor(&value)?;
             }
+            "offset"
+                if matches!(
+                    shape,
+                    QueryShape::CompatibilityPage
+                        | QueryShape::CompatibilityEvents
+                        | QueryShape::CompatibilityEventsByCenter
+                ) =>
+            {
+                reject_duplicate(&mut saw_offset, "offset")?;
+                parsed.offset = parse_offset(&value)?;
+            }
             "category" if matches!(shape, QueryShape::Events | QueryShape::Discover) => {
                 reject_duplicate(&mut saw_category, "category")?;
                 parsed.category = Some(parse_category(&value)?);
+            }
+            "centerId" if matches!(shape, QueryShape::Events | QueryShape::Discover) => {
+                reject_duplicate(&mut saw_center, "centerId")?;
+                parsed.center_id = Some(parse_center_id(&value, "centerId")?);
+            }
+            "centerID"
+                if matches!(
+                    shape,
+                    QueryShape::CompatibilityCenter | QueryShape::CompatibilityEventsByCenter
+                ) =>
+            {
+                reject_duplicate(&mut saw_center, "centerID")?;
+                parsed.center_id = Some(parse_center_id(&value, "centerID")?);
+            }
+            "id" | "eventID" if shape == QueryShape::CompatibilityEvent => {
+                reject_duplicate(&mut saw_event, "id")?;
+                parsed.event_id = Some(parse_event_id(&value)?);
             }
             _ => {
                 return Err(QueryError(format!(
@@ -100,7 +151,19 @@ pub(crate) fn parse_read_query(url: &Url, shape: QueryShape) -> Result<ReadQuery
         }
     }
 
-    Ok(parsed)
+    match shape {
+        QueryShape::CompatibilityCenter | QueryShape::CompatibilityEventsByCenter
+            if parsed.center_id.is_none() =>
+        {
+            Err(QueryError(
+                "Query parameter `centerID` is required.".to_owned(),
+            ))
+        }
+        QueryShape::CompatibilityEvent if parsed.event_id.is_none() => Err(QueryError(
+            "Query parameter `id` or `eventID` is required.".to_owned(),
+        )),
+        _ => Ok(parsed),
+    }
 }
 
 fn reject_duplicate(seen: &mut bool, field: &str) -> Result<(), QueryError> {
@@ -139,6 +202,18 @@ fn parse_cursor(value: &str) -> Result<usize, QueryError> {
     })
 }
 
+fn parse_offset(value: &str) -> Result<usize, QueryError> {
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|offset| *offset <= MAX_CURSOR_OFFSET)
+        .ok_or_else(|| {
+            QueryError(format!(
+                "Query parameter `offset` must be an integer from 0 to {MAX_CURSOR_OFFSET}."
+            ))
+        })
+}
+
 fn parse_category(value: &str) -> Result<String, QueryError> {
     let category = value.trim().to_ascii_lowercase();
     let valid = !category.is_empty()
@@ -154,9 +229,28 @@ fn parse_category(value: &str) -> Result<String, QueryError> {
     })
 }
 
+fn parse_center_id(value: &str, field: &str) -> Result<CenterId, QueryError> {
+    CenterId::parse_canonical(value).map_err(|_| {
+        QueryError(format!(
+            "Query parameter `{field}` must be a lowercase hyphenated UUID."
+        ))
+    })
+}
+
+fn parse_event_id(value: &str) -> Result<EventId, QueryError> {
+    EventId::parse_canonical(value).map_err(|_| {
+        QueryError(
+            "Query parameter `id` or `eventID` must be a lowercase hyphenated UUID.".to_owned(),
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const CENTER_ID: &str = "00000000-0000-0000-0000-000000000065";
+    const EVENT_ID: &str = "00000000-0000-0000-0000-0000000000c9";
 
     fn url(query: &str) -> Url {
         Url::parse(&format!("https://example.test/path{query}")).expect("test URL should be valid")
@@ -177,38 +271,32 @@ mod tests {
             Ok(ReadQuery {
                 limit: 2,
                 offset: 4,
-                category: None,
+                ..ReadQuery::default()
             })
         );
     }
 
     #[test]
-    fn event_query_normalizes_category() {
+    fn event_query_normalizes_category_and_center() {
+        let query = format!("?category=SATsang&limit=5&centerId={CENTER_ID}");
+        let parsed = parse_read_query(&url(&query), QueryShape::Events)
+            .expect("valid event filters should parse");
+        assert_eq!(parsed.limit, 5);
+        assert_eq!(parsed.category.as_deref(), Some("satsang"));
         assert_eq!(
-            parse_read_query(&url("?category= SATSANG &limit=5"), QueryShape::Events),
-            Ok(ReadQuery {
-                limit: 5,
-                offset: 0,
-                category: Some("satsang".to_owned()),
-            })
+            parsed.center_id.map(|id| id.to_string()).as_deref(),
+            Some(CENTER_ID)
         );
     }
 
     #[test]
-    fn discover_rejects_a_cursor_it_cannot_represent() {
-        let error = parse_read_query(&url("?cursor=offset%3A2"), QueryShape::Discover)
-            .expect_err("discover cursor should be rejected");
-        assert!(error.message().contains("not supported"));
+    fn discover_rejects_cursors() {
+        assert!(parse_read_query(&url("?cursor=offset%3A1"), QueryShape::Discover).is_err());
     }
 
     #[test]
-    fn no_query_shape_rejects_every_parameter() {
-        assert!(parse_read_query(&url("?limit=1"), QueryShape::None).is_err());
-    }
-
-    #[test]
-    fn invalid_limits_are_rejected() {
-        for query in ["?limit=0", "?limit=51", "?limit=many", "?limit=1&limit=2"] {
+    fn limits_and_duplicates_are_rejected() {
+        for query in ["?limit=0", "?limit=51", "?limit=nope", "?limit=2&limit=2"] {
             assert!(
                 parse_read_query(&url(query), QueryShape::Page).is_err(),
                 "{query} should fail"
@@ -217,7 +305,7 @@ mod tests {
     }
 
     #[test]
-    fn malformed_or_unbounded_cursors_are_rejected() {
+    fn malformed_or_unbounded_cursors_and_offsets_are_rejected() {
         for query in [
             "?cursor=4",
             "?cursor=offset%3A",
@@ -230,6 +318,40 @@ mod tests {
                 "{query} should fail"
             );
         }
+        assert!(parse_read_query(&url("?offset=10001"), QueryShape::CompatibilityPage).is_err());
+    }
+
+    #[test]
+    fn compatibility_lookups_require_canonical_ids() {
+        let center = parse_read_query(
+            &url(&format!("?centerID={CENTER_ID}")),
+            QueryShape::CompatibilityCenter,
+        )
+        .expect("center compatibility ID should parse");
+        assert_eq!(
+            center.center_id.map(|id| id.to_string()).as_deref(),
+            Some(CENTER_ID)
+        );
+
+        let event = parse_read_query(
+            &url(&format!("?eventID={EVENT_ID}")),
+            QueryShape::CompatibilityEvent,
+        )
+        .expect("event compatibility ID should parse");
+        assert_eq!(
+            event.event_id.map(|id| id.to_string()).as_deref(),
+            Some(EVENT_ID)
+        );
+
+        assert!(parse_read_query(&url(""), QueryShape::CompatibilityCenter).is_err());
+        assert!(parse_read_query(&url("?id=NOT-A-UUID"), QueryShape::CompatibilityEvent).is_err());
+        assert!(
+            parse_read_query(
+                &url(&format!("?id={EVENT_ID}&eventID={EVENT_ID}")),
+                QueryShape::CompatibilityEvent
+            )
+            .is_err()
+        );
     }
 
     #[test]

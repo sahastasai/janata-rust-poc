@@ -5,13 +5,19 @@
 //! reducers; authenticated production identity and live UI adapters remain
 //! explicit gates rather than simulated behavior.
 
+mod api;
 mod components;
+// Feed and Connect still use their local preview fixtures; the former Discover
+// fixture remains intentionally dormant now that discovery is Worker-backed.
+#[allow(dead_code)]
 mod model;
 mod pages;
 
 use components::AppShell;
 use dioxus::prelude::*;
-use pages::{Benchmarks, Connect, Discover, Docs, Feed, Home, NotFound, Profile};
+use pages::{
+    Benchmarks, CenterDetail, Connect, Discover, Docs, EventDetail, Feed, Home, NotFound, Profile,
+};
 
 static APP_CSS: Asset = asset!("/assets/main.css");
 static INCLUSIVE_REGULAR: Asset = asset!("/assets/fonts/InclusiveSans-Regular.ttf");
@@ -59,8 +65,13 @@ enum Route {
     #[layout(AppShell)]
         #[route("/")]
         Home,
-        #[route("/discover")]
+        #[redirect("/discover", || Route::Discover {})]
+        #[route("/explore")]
         Discover,
+        #[route("/center/:id")]
+        CenterDetail { id: String },
+        #[route("/events/:id")]
+        EventDetail { id: String },
         #[route("/feed")]
         Feed,
         #[route("/connect")]
@@ -83,7 +94,19 @@ mod tests {
     fn primary_routes_have_stable_paths() {
         let routes = [
             (Route::Home, "/"),
-            (Route::Discover, "/discover"),
+            (Route::Discover, "/explore"),
+            (
+                Route::CenterDetail {
+                    id: "00000000-0000-0000-0000-000000000065".to_owned(),
+                },
+                "/center/00000000-0000-0000-0000-000000000065",
+            ),
+            (
+                Route::EventDetail {
+                    id: "00000000-0000-0000-0000-0000000000c9".to_owned(),
+                },
+                "/events/00000000-0000-0000-0000-0000000000c9",
+            ),
             (Route::Feed, "/feed"),
             (Route::Connect, "/connect"),
             (Route::Profile, "/profile"),
@@ -94,5 +117,14 @@ mod tests {
         for (route, expected) in routes {
             assert_eq!(route.to_string(), expected);
         }
+    }
+
+    #[test]
+    fn legacy_discover_path_redirects_to_canonical_explore() {
+        assert!(
+            matches!("/discover".parse::<Route>(), Ok(Route::Discover)),
+            "the compatibility path should resolve to the Explore screen"
+        );
+        assert_eq!(Route::Discover.to_string(), "/explore");
     }
 }

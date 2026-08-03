@@ -11,5 +11,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 janata-api-contract = { path = "../api-contract" }
+janata-domain = { path = "../domain" }
 serde_json.workspace = true
 worker = "=0.8.5"
