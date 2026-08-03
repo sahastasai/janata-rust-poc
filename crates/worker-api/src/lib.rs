@@ -8,7 +8,7 @@ mod query;
 mod seed;
 
 use janata_api_contract::{ApiError, DiscoverResponse, FeedResponse, NotificationsResponse, Page};
-use query::{QueryShape, ReadQuery, parse_read_query};
+use query::{QueryError, QueryShape, ReadQuery, parse_read_query};
 use serde_json::{Value, json};
 use worker::js_sys::{Function, Reflect};
 use worker::wasm_bindgen::{JsCast, JsValue};
@@ -203,11 +203,10 @@ pub async fn fetch(request: Request, _env: Env, _context: Context) -> Result<Res
 
 fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Result<Response> {
     let origin = request.headers().get("origin")?;
-    let url = request.url()?;
 
     match classify_route(method, path) {
         ApiRoute::Health => health_response(request_id, origin.as_deref()),
-        ApiRoute::Discover => match parse_read_query(&url, QueryShape::Discover) {
+        ApiRoute::Discover => match request_query(request, QueryShape::Discover)? {
             Ok(query) => read_response(
                 serde_json::to_value(discover_payload(query)?)?,
                 CachePolicy::PublicShortLived,
@@ -216,7 +215,7 @@ fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Re
             ),
             Err(error) => invalid_query_response(&error, request_id, origin.as_deref()),
         },
-        ApiRoute::Events => match parse_read_query(&url, QueryShape::Events) {
+        ApiRoute::Events => match request_query(request, QueryShape::Events)? {
             Ok(query) => read_response(
                 events_payload(query)?,
                 CachePolicy::PublicShortLived,
@@ -225,7 +224,7 @@ fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Re
             ),
             Err(error) => invalid_query_response(&error, request_id, origin.as_deref()),
         },
-        ApiRoute::Feed => match parse_read_query(&url, QueryShape::Page) {
+        ApiRoute::Feed => match request_query(request, QueryShape::Page)? {
             Ok(query) => read_response(
                 serde_json::to_value(feed_payload(query)?)?,
                 CachePolicy::PublicShortLived,
@@ -234,7 +233,7 @@ fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Re
             ),
             Err(error) => invalid_query_response(&error, request_id, origin.as_deref()),
         },
-        ApiRoute::Notifications => match parse_read_query(&url, QueryShape::Page) {
+        ApiRoute::Notifications => match request_query(request, QueryShape::Page)? {
             Ok(query) => read_response(
                 serde_json::to_value(notifications_payload(query)?)?,
                 CachePolicy::PrivateNoStore,
@@ -243,7 +242,7 @@ fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Re
             ),
             Err(error) => invalid_query_response(&error, request_id, origin.as_deref()),
         },
-        ApiRoute::Bootstrap => match parse_read_query(&url, QueryShape::None) {
+        ApiRoute::Bootstrap => match request_query(request, QueryShape::None)? {
             Ok(_) => read_response(
                 bootstrap_payload()?,
                 CachePolicy::PrivateNoStore,
@@ -272,6 +271,13 @@ fn dispatch(request: &Request, method: &str, path: &str, request_id: &str) -> Re
             origin.as_deref(),
         ),
     }
+}
+
+fn request_query(
+    request: &Request,
+    shape: QueryShape,
+) -> Result<std::result::Result<ReadQuery, QueryError>> {
+    Ok(parse_read_query(&request.url()?, shape))
 }
 
 fn health_response(request_id: &str, origin: Option<&str>) -> Result<Response> {
