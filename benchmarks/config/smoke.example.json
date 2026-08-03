@@ -1,0 +1,45 @@
+{
+  "comparisonName": "Project Janatha benchmark harness smoke",
+  "variants": [
+    {
+      "id": "react-reference",
+      "role": "reference",
+      "label": "React/Expo reference",
+      "sourceRoot": "/home/sahastasai/Development/agent-worktrees/project-janatha-reference-benchmark",
+      "expectedCommit": "6e5bbacd2277b564a901e1eb4f48b566a1283802",
+      "buildCommand": "bunx expo export --platform web --output-dir dist-reference",
+      "bundleDir": "packages/frontend/dist-reference",
+      "pageBaseUrl": "http://127.0.0.1:8081",
+      "apiBaseUrl": "http://127.0.0.1:8787"
+    },
+    {
+      "id": "dioxus-poc",
+      "role": "candidate",
+      "label": "Dioxus Rust POC",
+      "sourceRoot": "../..",
+      "buildCommand": "dx bundle --web --release",
+      "bundleDir": "target/dx/janata-ui/release/web/public",
+      "pageBaseUrl": "http://127.0.0.1:8082",
+      "apiBaseUrl": "http://127.0.0.1:8788"
+    }
+  ],
+  "browser": {
+    "runs": 1,
+    "cacheModes": ["cold"],
+    "settleMs": 1500,
+    "navigationTimeoutMs": 30000,
+    "cpuThrottleRate": 1,
+    "network": { "latencyMs": 0, "downloadKbps": 0, "uploadKbps": 0 },
+    "routes": [{ "id": "landing", "path": "/" }]
+  },
+  "api": {
+    "runs": 1,
+    "durationSeconds": 1,
+    "concurrency": 1,
+    "maxRequests": 10,
+    "warmupRequests": 1,
+    "scenarios": [
+      { "id": "health", "method": "GET", "path": "/api/health", "expectedStatuses": [200] }
+    ]
+  }
+}
