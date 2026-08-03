@@ -1,0 +1,15 @@
+[package]
+name = "janata-worker-api"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+janata-api-contract = { path = "../api-contract" }
+serde_json.workspace = true
+worker = { version = "=0.8.5", features = ["d1", "http"] }

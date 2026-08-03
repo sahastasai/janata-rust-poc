@@ -1,0 +1,17 @@
+[package]
+name = "janata-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["web"]
+web = ["dioxus/web"]
+mobile = ["dioxus/mobile"]
+
+[dependencies]
+dioxus = { workspace = true, features = ["router"] }
+janata-api-contract = { path = "../../crates/api-contract" }
+janata-domain = { path = "../../crates/domain" }
