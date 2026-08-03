@@ -1,0 +1,23 @@
+[application]
+name = "janata-ui"
+
+[web]
+pre_compress = true
+
+[web.app]
+title = "Chinmaya Janata — Rust proof of concept"
+
+[web.watcher]
+reload_html = true
+watch_path = ["apps/janata-ui/src", "apps/janata-ui/assets"]
+index_on_404 = true
+
+[web.wasm_opt]
+level = "z"
+debug = false
+
+[bundle]
+identifier = "com.sahasta.janata.poc"
+publisher = "Chinmaya Janata"
+category = "SocialNetworking"
+short_description = "A cross-platform Rust proof of concept for Chinmaya Janata."
