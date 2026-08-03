@@ -1,0 +1,14 @@
+{
+  "name": "janata-rust-poc-tooling",
+  "private": true,
+  "packageManager": "bun@1.3.7",
+  "devDependencies": {
+    "wrangler": "4.118.0"
+  },
+  "scripts": {
+    "worker:dev": "wrangler dev --local --config deploy/wrangler.jsonc",
+    "worker:dry-run": "wrangler deploy --dry-run --config deploy/wrangler.jsonc",
+    "worker:smoke": "bun deploy/smoke-worker.ts",
+    "worker:startup": "deploy/profile-worker.sh"
+  }
+}
