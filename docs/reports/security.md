@@ -65,6 +65,15 @@ The standard CI workflow enforces:
 - Rust advisory scanning, presence of dependency license metadata, and a
   pinned Gitleaks history scan with read-only repository permission.
 
+The RustSec scan currently reports 14 **informational** notices from the
+Dioxus Desktop/mobile dependency tree: retired GTK3 bindings, `fxhash`,
+`paste`, and `proc-macro-error`, plus soundness notices for `glib 0.18.5` and
+the build-time `rand 0.7.3` used through `wry`/`kuchikiki`. They are not in the
+deployed web/Worker runtime, but they remain a mobile release risk. CI fails on
+RustSec vulnerabilities and prints these notices on every run; upgrading or
+replacing the upstream Dioxus Desktop chain is required before beta rather than
+silently ignoring advisory IDs.
+
 All third-party actions use immutable commit SHAs. Rust, Bun, Dioxus CLI,
 mdBook, and cargo-audit versions are explicit. This reduces drift but does not
 replace review of action source, transitive installer downloads, or runner

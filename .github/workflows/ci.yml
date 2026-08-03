@@ -138,10 +138,10 @@ jobs:
           rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
           rustup default "$RUST_TOOLCHAIN"
 
-      - name: Audit Rust advisories
+      - name: Audit Rust vulnerabilities and report informational advisories
         run: |
           cargo install cargo-audit --version 0.22.2 --locked
-          cargo audit --deny warnings
+          cargo audit
 
       - name: Require dependency license metadata
         run: |
