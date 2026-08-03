@@ -9,6 +9,12 @@ The target design uses rotated server sessions in `Secure`, `HttpOnly`,
 `SameSite` cookies. State-changing requests also carry a CSRF token. The browser
 does not store long-lived bearer tokens in local storage.
 
+The local D1 authentication proof also applies account-key and shared
+password-derivation rate-limit bindings after cheap request validation. These
+bindings are a circuit breaker, not an exact global quota: Cloudflare evaluates
+them permissively in each location. Production promotion still requires staged
+edge load tests and a separately reviewed bot-abuse layer.
+
 ## Native sessions
 
 Mobile clients use short-lived access tokens and a rotated refresh credential

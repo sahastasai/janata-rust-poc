@@ -9,6 +9,7 @@
 
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -16,8 +17,9 @@ const repoRoot = resolve(import.meta.dir, "../..");
 const configPath = "deploy/wrangler.auth-local.jsonc";
 const database = "janata-cmrust-poc-auth-local";
 const host = "127.0.0.1";
-const port = 8_787;
-const origin = `http://${host}:${port}`;
+const allowedOrigin = `http://${host}:8787`;
+const port = await availablePort();
+const targetOrigin = `http://${host}:${port}`;
 const fixtureInvite = "janata-local-invite-2026";
 const fixturePassphrase = "correct-horse-battery";
 const stateDirectory = await mkdtemp(join(tmpdir(), "janata-auth-workerd-"));
@@ -25,6 +27,21 @@ const siteDirectory = join(repoRoot, "dist/site");
 const createdSite = !existsSync(siteDirectory);
 
 type Json = Record<string, unknown>;
+
+async function availablePort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolveListen, reject) => {
+    server.once("error", reject);
+    server.listen(0, host, resolveListen);
+  });
+  const address = server.address();
+  assert(address && typeof address !== "string", "Could not reserve an ephemeral loopback port");
+  const selectedPort = address.port;
+  await new Promise<void>((resolveClose, reject) => {
+    server.close((error) => (error ? reject(error) : resolveClose()));
+  });
+  return selectedPort;
+}
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -54,7 +71,7 @@ async function jsonRequest(
   path: string,
   init: RequestInit = {},
 ): Promise<{ response: Response; body: Json }> {
-  const response = await fetch(origin + path, init);
+  const response = await fetch(targetOrigin + path, init);
   const body = (await response.json()) as Json;
   return { response, body };
 }
@@ -62,7 +79,7 @@ async function jsonRequest(
 function post(body: Json, headers: HeadersInit = {}): RequestInit {
   return {
     method: "POST",
-    headers: { origin, "content-type": "application/json", ...headers },
+    headers: { origin: allowedOrigin, "content-type": "application/json", ...headers },
     body: JSON.stringify(body),
   };
 }
@@ -71,7 +88,7 @@ async function waitForWorker(logs: () => string): Promise<void> {
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(origin + "/api/health");
+      const response = await fetch(targetOrigin + "/api/health");
       if (response.ok) return;
     } catch {
       // Build and startup are still in progress.
@@ -116,6 +133,27 @@ async function exerciseAuth(): Promise<void> {
   assert(result.response.status === 403, "forged origin must be rejected");
   assert((result.body.error as Json).code === "origin_forbidden", "origin error code");
 
+  // The shared KDF circuit breaker protects expensive password derivation,
+  // not cheap parsing. More malformed calls than its configured allowance
+  // must therefore remain 400s and leave the later real auth flow usable.
+  let malformedAttempts = 0;
+  while (malformedAttempts < 1_201) {
+    const batchSize = Math.min(100, 1_201 - malformedAttempts);
+    const malformed = await Promise.all(
+      Array.from({ length: batchSize }, () =>
+        jsonRequest("/api/v1/auth/login", post({ malformed: true })),
+      ),
+    );
+    assert(
+      malformed.every(
+        ({ response, body }) =>
+          response.status === 400 && (body.error as Json).code === "invalid_json",
+      ),
+      "malformed requests must not consume the password-derivation allowance",
+    );
+    malformedAttempts += batchSize;
+  }
+
   result = await jsonRequest(
     "/api/v1/auth/invite/validate",
     post({ code: fixtureInvite }),
@@ -124,6 +162,10 @@ async function exerciseAuth(): Promise<void> {
   assert(
     result.response.headers.get("access-control-allow-credentials") === "true",
     "auth CORS response must permit credentials only for the exact origin",
+  );
+  assert(
+    result.response.headers.get("access-control-allow-origin") === allowedOrigin,
+    "auth CORS response must reflect only the exact allowed origin",
   );
 
   // Two concurrent attempts for the same email must produce one account and
@@ -194,7 +236,7 @@ async function exerciseAuth(): Promise<void> {
   assert(csrf, "CSRF cookie must be present");
 
   result = await jsonRequest("/api/v1/auth/session", {
-    headers: { origin, cookie: cookieHeader },
+    headers: { origin: allowedOrigin, cookie: cookieHeader },
   });
   assert(result.body.authenticated === true, "session cookie must resolve the member");
   assert((result.body.user as Json).displayName === "Local Integration Member", "live identity");
@@ -217,14 +259,14 @@ async function exerciseAuth(): Promise<void> {
   );
 
   result = await jsonRequest("/api/v1/auth/session", {
-    headers: { origin, cookie: cookieHeader },
+    headers: { origin: allowedOrigin, cookie: cookieHeader },
   });
   assert(result.body.authenticated === false, "revoked cookie must resolve as guest");
 
-  const preflight = await fetch(origin + "/api/v1/auth/login", {
+  const preflight = await fetch(targetOrigin + "/api/v1/auth/login", {
     method: "OPTIONS",
     headers: {
-      origin,
+      origin: allowedOrigin,
       "access-control-request-method": "POST",
       "access-control-request-headers": "content-type, x-csrf-token",
     },

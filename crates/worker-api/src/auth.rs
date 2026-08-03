@@ -160,15 +160,6 @@ pub(crate) async fn handle(
     request: &mut Request,
     env: &Env,
 ) -> Result<AuthResult> {
-    if matches!(action, AuthAction::Register | AuthAction::Login)
-        && !env
-            .rate_limiter(AUTH_KDF_LIMITER_BINDING)?
-            .limit("password-auth".to_owned())
-            .await?
-            .success
-    {
-        return Ok(Err(rate_limited()));
-    }
     let db = env.d1(AUTH_DB_BINDING)?;
     match action {
         AuthAction::ValidateInvite => validate_invite(request, &db).await,
@@ -232,6 +223,9 @@ async fn register(request: &mut Request, db: &D1Database, env: &Env) -> Result<A
         Ok(code) => code,
         Err(problem) => return Ok(Err(problem)),
     };
+    if !kdf_rate_allowed(env).await? {
+        return Ok(Err(rate_limited()));
+    }
 
     let salt = random_bytes(PASSWORD_SALT_BYTES)?;
     let password_hash = pbkdf2(&input.password, &salt, PASSWORD_ITERATIONS).await?;
@@ -344,6 +338,9 @@ async fn login(request: &mut Request, db: &D1Database, env: &Env) -> Result<Auth
                 vec![0_u8; PASSWORD_HASH_BYTES],
             )
         });
+    if !kdf_rate_allowed(env).await? {
+        return Ok(Err(rate_limited()));
+    }
     let candidate = pbkdf2(&input.password, &salt, iterations).await?;
     let password_matches = timing_safe_equal(&candidate, &expected_hash)?;
     let now = unix_seconds();
@@ -549,6 +546,14 @@ async fn account_rate_allowed(env: &Env, scope: &str, email: &str) -> Result<boo
     Ok(env
         .rate_limiter(AUTH_ACCOUNT_LIMITER_BINDING)?
         .limit(format!("{scope}:{account_hash}"))
+        .await?
+        .success)
+}
+
+async fn kdf_rate_allowed(env: &Env) -> Result<bool> {
+    Ok(env
+        .rate_limiter(AUTH_KDF_LIMITER_BINDING)?
+        .limit("password-auth".to_owned())
         .await?
         .success)
 }
