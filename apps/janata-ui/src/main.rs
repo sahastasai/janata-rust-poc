@@ -1,8 +1,9 @@
 //! Cross-platform entry point for the Janata Dioxus proof of concept.
 //!
-//! This binary intentionally contains only presentation and local interaction
-//! state. Network-backed behavior is added behind shared contracts after the UI
-//! compile gate has been reviewed.
+//! This binary contains presentation and local interaction state. The integrated
+//! POC also has typed, read-only Worker contracts and locally proven private
+//! reducers; authenticated production identity and live UI adapters remain
+//! explicit gates rather than simulated behavior.
 
 mod components;
 mod model;

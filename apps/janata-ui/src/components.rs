@@ -27,8 +27,8 @@ pub(crate) fn AppShell() -> Element {
                 div { class: "sidebar-note",
                     span { class: "status-dot", "aria-hidden": "true" }
                     div {
-                        strong { "UI compile gate" }
-                        small { "No production data" }
+                        strong { "Integrated Rust POC" }
+                        small { "Read-only · identity gated" }
                     }
                 }
             }

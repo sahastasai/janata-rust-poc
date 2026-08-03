@@ -1,4 +1,4 @@
-//! Static, clearly labelled preview content for the compile-gate shell.
+//! Static, clearly labelled preview content for the integrated POC shell.
 
 /// A discoverable community event used only to exercise the presentation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -127,9 +127,6 @@ mod tests {
         assert!(EVENTS.iter().all(|event| !event.title.is_empty()));
         assert!(POSTS.iter().all(|post| !post.body.is_empty()));
         assert!(CONVERSATIONS.iter().all(|thread| !thread.name.is_empty()));
-        assert!(
-            EVENTS.len() <= 8,
-            "compile-gate screens should stay concise"
-        );
+        assert!(EVENTS.len() <= 8, "POC screens should stay concise");
     }
 }

@@ -2,10 +2,11 @@
 
 ## Subject, audience, and job
 
-This shell is a proof of concept for Chinmaya Janata: a community member (or an
-open-source contributor reviewing the migration) should understand the product,
-move through its core destinations, and distinguish working local interactions
-from backend-connected functionality that is still planned.
+This integrated proof of concept is for Chinmaya Janata: a community member (or
+an open-source contributor reviewing the migration) should understand the
+product, move through its core destinations, and distinguish the proven
+read-only Worker/private-reducer foundation from production identity and live UI
+adapters that remain gated.
 
 ## Tokens
 
@@ -95,9 +96,9 @@ project's existing sans-serif identity, asymmetrical portrait crop, and one
 functional orange line. Rounded cards are reserved for actual grouped controls
 or data; structural areas use spacing and rules.
 
-The portrait must provide context without implying endorsement of unmeasured
-benchmark numbers. Benchmarks are labelled as methodology or pending evidence,
-and all sample community content is visibly marked `Preview data`.
+The portrait must provide context without implying endorsement of benchmark
+claims. Measured local evidence always carries its method and limitations, and
+all sample community content is visibly marked `Preview data`.
 
 ## Post-build critique checklist
 
@@ -106,3 +107,28 @@ and all sample community content is visibly marked `Preview data`.
 - Check that dark mode retains legible muted text and image treatment.
 - Check `prefers-reduced-motion` and high-contrast / forced-colors behavior.
 - Remove any flourish that competes with the saffron thread or portrait.
+
+## Integrated evidence update
+
+The benchmark screen's single job is to help a technical reviewer judge the POC
+without hiding an unfavorable result. Its layout is a measured ledger rather
+than a celebratory dashboard:
+
+```text
+┌───────────────────────────────────────────────────────────────┐
+│ The local result is mixed.                                    │
+│ Dioxus: bundle + landing LCP     Hono: health throughput/p95  │
+├───────────────────────────────────────────────────────────────┤
+│ Browser and bundle evidence (React │ Dioxus │ result)         │
+├───────────────────────────────────────────────────────────────┤
+│ Worker health evidence (Hono │ workers-rs │ result)           │
+├───────────────────────────────────────────────────────────────┤
+│ Limitations live beside the numbers, not in a distant note.   │
+└───────────────────────────────────────────────────────────────┘
+```
+
+The risk was allowing large favorable numbers to become a generic performance
+scoreboard. The revision uses tabular numerals, quiet rules, full byte counts,
+and equal visual weight for the workers-rs loss. Saffron identifies the Dioxus
+browser evidence; river blue identifies the Hono backend result. Neither color
+means universally better.

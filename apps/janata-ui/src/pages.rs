@@ -1,4 +1,4 @@
-//! Routed screens for the Janata UI compile gate.
+//! Routed screens for the integrated Janata proof of concept.
 
 use crate::{
     Route,
@@ -30,8 +30,8 @@ pub(crate) fn Home() -> Element {
                 }
                 ul { class: "proof-list", "aria-label": "Proof of concept boundaries",
                     li { "Type-safe routes" }
-                    li { "Shared responsive UI" }
-                    li { "Backend adapters pending" }
+                    li { "Read-only Worker APIs proven" }
+                    li { "Private reducers proven locally" }
                 }
             }
             figure { class: "portrait-card",
@@ -51,31 +51,31 @@ pub(crate) fn Home() -> Element {
 
         section { class: "home-evidence", "aria-labelledby": "gate-title",
             div { class: "evidence-intro",
-                p { class: "kicker", "THE COMPILE GATE" }
-                h2 { id: "gate-title", "Small enough to inspect. Real enough to test." }
-                p { "This slice proves routing, state, assets, responsive layouts, and platform feature selection. It does not present static examples as a connected service." }
+                p { class: "kicker", "THE INTEGRATED POC" }
+                h2 { id: "gate-title", "The foundation works. The boundaries stay visible." }
+                p { "The shell now sits beside typed read-only Worker routes and locally proven private SpacetimeDB reducers. Sample community cards remain UI-only and are never presented as live accounts or messages." }
                 div { class: "evidence-actions",
-                    Link { to: Route::Benchmarks, "Open benchmark method →" }
+                    Link { to: Route::Benchmarks, "Review measured evidence →" }
                     Link { to: Route::Docs, "Open contributor docs →" }
                 }
             }
             div { class: "gate-grid",
                 article { class: "gate-card",
                     span { class: "gate-index", "IN" }
-                    h3 { "In this slice" }
+                    h3 { "Proven together" }
                     ul {
-                        li { "Seven reviewable destinations" }
-                        li { "Desktop rail and mobile tab bar" }
-                        li { "Light, dark, focus, and reduced-motion tokens" }
+                        li { "Responsive Dioxus web and mobile feature builds" }
+                        li { "Typed read-only Worker routes and contracts" }
+                        li { "Private SpacetimeDB reducers validated locally" }
                     }
                 }
                 article { class: "gate-card gate-card-muted",
-                    span { class: "gate-index", "NEXT" }
-                    h3 { "Requires integration" }
+                    span { class: "gate-index", "GATE" }
+                    h3 { "Required before beta" }
                     ul {
-                        li { "Authentication and permissions" }
-                        li { "Worker API and SpacetimeDB subscriptions" }
-                        li { "Measured React-versus-Rust benchmark artifacts" }
+                        li { "Authenticated production identity and authorization" }
+                        li { "Live UI adapters for Worker reads and subscriptions" }
+                        li { "Native device distribution and end-to-end parity" }
                     }
                 }
             }
@@ -213,7 +213,7 @@ pub(crate) fn Connect() -> Element {
                 kicker: "CONNECT",
                 title: "Conversations with context",
                 summary: "Keep direct messages, event chats, and center coordination in one calm workspace.",
-                status: "SpacetimeDB adapter pending",
+                status: "Private reducers proven locally",
             }
             PreviewNotice {}
             section { class: "messenger", "aria-label": "Message preview",
@@ -252,7 +252,7 @@ pub(crate) fn Connect() -> Element {
                     }
                     form { class: "composer", onsubmit: move |event| event.prevent_default(),
                         label { class: "sr-only", r#for: "message-draft", "Message" }
-                        input { id: "message-draft", placeholder: "Messaging adapter not connected", disabled: true }
+                        input { id: "message-draft", placeholder: "Live UI subscription is gated", disabled: true }
                         button { r#type: "submit", disabled: true, "Send" }
                     }
                 }
@@ -326,7 +326,7 @@ pub(crate) fn Profile() -> Element {
     }
 }
 
-/// Hosts benchmark methodology and only displays measured claims once supplied.
+/// Presents measured local migration evidence, including unfavorable results.
 #[component]
 pub(crate) fn Benchmarks() -> Element {
     rsx! {
@@ -334,39 +334,119 @@ pub(crate) fn Benchmarks() -> Element {
         div { class: "page evidence-page",
             PageHeader {
                 kicker: "MIGRATION EVIDENCE",
-                title: "Evidence only. Never vibes.",
-                summary: "This route defines how the React Native web build and Dioxus web build must be measured on equivalent journeys before anyone calls one faster.",
-                status: "Results pending",
+                title: "The local result is mixed — and useful.",
+                summary: "Dioxus produced a much smaller logical web release and lower 30-run landing LCP medians. The workers-rs health path was materially slower than the current Hono baseline.",
+                status: "Measured locally · August 2026",
             }
-            div { class: "benchmark-callout",
-                strong { "No comparative numbers are published in this UI spike." }
-                p { "The testing agent should replace pending cells only from repeatable artifacts that record commit, machine, build mode, and sample count." }
-            }
-            section { class: "method-grid",
-                article {
-                    p { class: "utility-label", "BROWSER JOURNEY" }
-                    h2 { "Cold-load and route" }
-                    p { "Build both apps for production, clear caches, load Home, then navigate Discover → Feed → Connect." }
+            section { class: "verdict-grid", "aria-label": "Benchmark result summary",
+                article { class: "verdict verdict-dioxus",
+                    p { class: "utility-label", "DIOXUS LEADS LOCALLY" }
+                    h2 { "Web release size and landing LCP" }
+                    p { "The Rust UI won both measured browser categories on this machine." }
                 }
-                article {
-                    p { class: "utility-label", "MEASURE" }
-                    h2 { "Transfer, CPU, memory" }
-                    p { "Capture compressed bytes, Web Vitals, scripting time, heap, and route transition latency at matched viewports." }
-                }
-                article {
-                    p { class: "utility-label", "REPORT" }
-                    h2 { "Median plus spread" }
-                    p { "Run enough samples to publish median, p75, p95, variance, and any statistically meaningful caveats." }
+                article { class: "verdict verdict-react",
+                    p { class: "utility-label", "REACT / HONO LEADS LOCALLY" }
+                    h2 { "Worker health throughput and p95" }
+                    p { "The existing Hono health endpoint was roughly an order of magnitude faster in this local microbenchmark." }
                 }
             }
-            section { class: "checks", "aria-labelledby": "evidence-title",
-                h2 { id: "evidence-title", "Evidence matrix" }
-                CheckRow { label: "Dioxus release bundle", detail: "WASM, JS glue, CSS, fonts, and image transfer", state: "Pending" }
-                CheckRow { label: "React Native web baseline", detail: "Same content, viewport, network, and browser", state: "Pending" }
-                CheckRow { label: "Mobile parity", detail: "Android and iOS startup, navigation, and memory", state: "Pending" }
-                CheckRow { label: "Load profile", detail: "500 concurrent beta clients plus burst and soak", state: "Pending" }
+
+            section { class: "benchmark-section", "aria-labelledby": "web-evidence-title",
+                header { class: "benchmark-section-header",
+                    div {
+                        p { class: "utility-label", "WEB RELEASE + LANDING" }
+                        h2 { id: "web-evidence-title", "Browser evidence" }
+                    }
+                    span { "Logical output · 30-run LCP medians" }
+                }
+                div { class: "table-scroll", tabindex: "0", "aria-label": "Scrollable browser benchmark comparison",
+                    table { class: "evidence-table",
+                        thead {
+                            tr {
+                                th { scope: "col", "Measure" }
+                                th { scope: "col", "React Native web" }
+                                th { scope: "col", "Dioxus" }
+                                th { scope: "col", "Local result" }
+                            }
+                        }
+                        tbody {
+                            tr {
+                                th { scope: "row", "Logical release output · raw" }
+                                td { class: "evidence-number", "17,051,891 B" }
+                                td { class: "evidence-number", "2,523,828 B" }
+                                td { span { class: "result result-dioxus", "Dioxus smaller" } }
+                            }
+                            tr {
+                                th { scope: "row", "Logical release output · Brotli estimate" }
+                                td { class: "evidence-number", "12,390,855 B" }
+                                td { class: "evidence-number", "2,221,165 B" }
+                                td { span { class: "result result-dioxus", "Dioxus smaller" } }
+                            }
+                            tr {
+                                th { scope: "row", "Landing LCP · cold median" }
+                                td { class: "evidence-number", "756 ms" }
+                                td { class: "evidence-number", "144 ms" }
+                                td { span { class: "result result-dioxus", "Dioxus lower" } }
+                            }
+                            tr {
+                                th { scope: "row", "Landing LCP · warm median" }
+                                td { class: "evidence-number", "620 ms" }
+                                td { class: "evidence-number", "140 ms" }
+                                td { span { class: "result result-dioxus", "Dioxus lower" } }
+                            }
+                        }
+                    }
+                }
             }
-            pre { class: "command-block", code { "# Build evidence must use release output\ndx build --web --release\n# Record raw results under the benchmark report's artifact directory" } }
+
+            section { class: "benchmark-section benchmark-section-react", "aria-labelledby": "worker-evidence-title",
+                header { class: "benchmark-section-header",
+                    div {
+                        p { class: "utility-label", "LOCAL HEALTH ENDPOINT" }
+                        h2 { id: "worker-evidence-title", "Backend evidence" }
+                    }
+                    span { "Local microbenchmark · approximate" }
+                }
+                div { class: "table-scroll", tabindex: "0", "aria-label": "Scrollable Worker benchmark comparison",
+                    table { class: "evidence-table",
+                        thead {
+                            tr {
+                                th { scope: "col", "Measure" }
+                                th { scope: "col", "Hono baseline" }
+                                th { scope: "col", "workers-rs POC" }
+                                th { scope: "col", "Local result" }
+                            }
+                        }
+                        tbody {
+                            tr {
+                                th { scope: "row", "Health throughput" }
+                                td { class: "evidence-number", "~1,400 req/s" }
+                                td { class: "evidence-number", "~129 req/s" }
+                                td { span { class: "result result-react", "Hono higher" } }
+                            }
+                            tr {
+                                th { scope: "row", "Health p95 latency" }
+                                td { class: "evidence-number", "~25 ms" }
+                                td { class: "evidence-number", "~259 ms" }
+                                td { span { class: "result result-react", "Hono lower" } }
+                            }
+                        }
+                    }
+                }
+            }
+
+            section { class: "benchmark-limitations", "aria-labelledby": "limitations-title",
+                p { class: "utility-label", "READ BEFORE DECIDING" }
+                h2 { id: "limitations-title", "What these numbers do not prove" }
+                ul {
+                    li { "These are local measurements, not production Cloudflare latency or a global user sample." }
+                    li { "The LCP figures are 30-run landing-page medians; they do not establish full feature parity, p75 Core Web Vitals, or native mobile performance." }
+                    li { "Release-size totals are logical output and file-by-file Brotli estimates, not bytes transferred for every user journey." }
+                    li { "The health test is a narrow endpoint microbenchmark. It exposes a real workers-rs regression, but does not model cached reads, durable messaging, or application-level work." }
+                    li { "Authenticated production identity, live UI data adapters, 500-client load, soak behavior, and Android/iOS distributions remain release gates." }
+                }
+            }
+            pre { class: "command-block", code { "# Reproduce against pinned commits and release builds\ndx build --web --release\n# Preserve raw samples, machine details, and browser/tool versions with the report" } }
         }
     }
 }
@@ -381,7 +461,12 @@ pub(crate) fn Docs() -> Element {
                 kicker: "CONTRIBUTOR DOCS",
                 title: "New to Rust? Start with the shape of the app.",
                 summary: "You do not need to memorize Rust before contributing. Learn the route you are changing, follow its data boundary, and let the compiler point to the next concrete step.",
-                status: "Living guide",
+                status: "Hosted guide + API reference",
+            }
+            div { class: "docs-destinations", role: "group", "aria-label": "Hosted documentation",
+                a { class: "button button-primary", href: "/docs/guide/", "Open contributor guide" }
+                a { class: "button button-quiet", href: "/docs/api/", "Open Rust API reference" }
+                p { "These are normal same-origin links so the hosted mdBook and rustdoc sites load outside the Dioxus router." }
             }
             nav { class: "docs-toc", "aria-label": "On this page",
                 a { href: "#mental-model", "Mental model" }
@@ -417,8 +502,8 @@ pub(crate) fn Docs() -> Element {
             }
             section { id: "boundaries", class: "docs-section docs-warning",
                 p { class: "utility-label", "04 · POC BOUNDARIES" }
-                h2 { "Static previews are not product behavior." }
-                p { "The UI in this slice deliberately uses small compile-time arrays. Authentication, authorization, API error states, persistence, realtime subscriptions, native permissions, and measured performance belong to integration work and must be tested before a beta." }
+                h2 { "The foundation is real; the member experience is not live yet." }
+                p { "Typed read-only Worker APIs and private SpacetimeDB reducers have been proven locally. The community cards on these screens still use small compile-time arrays. Authenticated production identity, authorization, live Worker reads, realtime UI subscriptions, native permissions, and end-to-end mobile distributions remain gated before beta." }
             }
         }
     }
