@@ -59,6 +59,24 @@ try {
     "static security headers were not applied",
   );
 
+  for (const rustdocPath of ["/docs/api", "/docs/api/"]) {
+    const rustdoc = await fetch(`${baseUrl}${rustdocPath}`);
+    assert(rustdoc.status === 200, `${rustdocPath} did not return 200`);
+    assert(
+      (await rustdoc.text()).includes("Janata Rust API reference"),
+      `${rustdocPath} fell through to the Dioxus router`,
+    );
+  }
+
+  const domainDocs = await fetch(
+    `${baseUrl}/docs/api/janata_domain/index.html`,
+  );
+  assert(domainDocs.status === 200, "domain rustdoc did not return 200");
+  assert(
+    (await domainDocs.text()).includes("Crate janata_domain"),
+    "domain rustdoc did not serve the generated crate page",
+  );
+
   const spa = await fetch(`${baseUrl}/contributors/welcome`, {
     headers: { "Sec-Fetch-Mode": "navigate" },
   });
@@ -135,7 +153,9 @@ try {
   const wrongPath = await fetch(`${baseUrl}/api/missing`);
   assert(wrongPath.status === 404, "unknown API path did not return 404");
 
-  console.log("Worker smoke test passed (static, SPA, API, CORS, and 404 checks).");
+  console.log(
+    "Worker smoke test passed (static, rustdoc, SPA, API, CORS, and 404 checks).",
+  );
 } finally {
   server.kill("SIGTERM");
   await server.exited;
