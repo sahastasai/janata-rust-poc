@@ -21,7 +21,9 @@
   "assets": {
     "directory": "../dist/site",
     "not_found_handling": "single-page-application",
-    "html_handling": "none",
+    // Canonicalize and serve generated directory indexes such as mdBook and
+    // rustdoc without sending them through the Dioxus SPA fallback.
+    "html_handling": "auto-trailing-slash",
     "run_worker_first": ["/api/*"]
   },
   "observability": {

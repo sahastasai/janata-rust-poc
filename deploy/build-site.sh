@@ -37,6 +37,10 @@ rsync -a --exclude '*.br' --exclude '*.gz' "$ui_output/" "$site_output/"
 mkdir -p "$site_output/docs"
 rsync -a --delete "$repo_root/dist/docs/guide/" "$site_output/docs/guide/"
 rsync -a --delete "$repo_root/target/doc/" "$site_output/docs/api/"
+# Cargo rustdoc emits one index per crate but no workspace landing page. Keep
+# the documented `/docs/api/` route out of the SPA fallback with an explicit,
+# contributor-friendly crate directory.
+cp "$repo_root/deploy/static/rustdoc-index.html" "$site_output/docs/api/index.html"
 rsync -a --delete "$repo_root/benchmarks/evidence/" "$site_output/docs/evidence/"
 rsync -a --delete "$repo_root/docs/reports/" "$site_output/docs/reports/"
 cp "$repo_root/deploy/static/_headers" "$site_output/_headers"
