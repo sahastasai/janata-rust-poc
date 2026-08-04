@@ -144,10 +144,14 @@ try {
   const wrongMethodBody = (await wrongMethod.json()) as {
     error?: { code?: string };
   };
-  assert(wrongMethod.status === 404, "unsupported method did not return 404");
+  assert(wrongMethod.status === 405, "unsupported method did not return 405");
   assert(
-    wrongMethodBody.error?.code === "not_found",
+    wrongMethodBody.error?.code === "method_not_allowed",
     "unsupported method did not return structured JSON",
+  );
+  assert(
+    wrongMethod.headers.get("allow") === "GET, OPTIONS",
+    "unsupported method did not advertise the allowed methods",
   );
 
   const wrongPath = await fetch(`${baseUrl}/api/missing`);
